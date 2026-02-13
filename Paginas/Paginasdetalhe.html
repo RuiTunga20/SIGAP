@@ -194,51 +194,50 @@
 
                     {% if e_administrador %}
                     <!-- Despacho e Decisão Card -->
-                    <div class="bg-slate-900 rounded-2xl shadow-2xl overflow-hidden border border-slate-800">
-                        <div class="px-6 py-5 border-b border-slate-800 bg-slate-800/50 flex items-center gap-2">
-                            <i data-lucide="pen-tool" class="w-5 h-5 text-amber-500"></i>
-                            <h3 class="text-sm font-black uppercase tracking-widest text-slate-400">Gabinete de Decisão (Despacho)</h3>
+                    <div class="bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-100 relative">
+                        <div class="absolute top-0 left-0 w-1 h-full bg-amber-400/30"></div>
+                        <div class="px-6 py-5 border-b border-slate-50 bg-amber-50/20 flex items-center justify-between">
+                            <div class="flex items-center gap-2">
+                                <div class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></div>
+                                <h3 class="text-xs font-black uppercase tracking-[0.15em] text-slate-600">Gabinete de Decisão (Despacho)</h3>
+                            </div>
+                            <i data-lucide="shield-check" class="w-4 h-4 text-amber-500 opacity-50"></i>
                         </div>
-                        <div class="p-6 space-y-8">
-                            <form method="post" class="space-y-4">
+                        <div class="p-8 space-y-8">
+                            <form method="post" class="space-y-6">
                                 {% csrf_token %}
                                 <input type="hidden" name="action" value="despacho">
                                 <div class="space-y-2">
-                                    <label class="text-xs font-bold text-slate-400 uppercase tracking-wider block">Inserir Despacho Oficial</label>
+                                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest block ml-1 transition-colors">Inserir Despacho Oficial</label>
                                     {{ despacho_form.despacho }}
                                 </div>
-                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-end">
                                     <div class="space-y-2">
-                                        <label class="text-xs font-bold text-slate-400 uppercase tracking-wider block">Nova Classificação (Opcional)</label>
+                                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest block ml-1">Nova Classificação (Opcional)</label>
                                         {{ despacho_form.novo_status }}
                                     </div>
-                                    <button type="submit" class="bg-amber-500 hover:bg-amber-600 text-slate-900 px-6 py-2.5 rounded-xl font-black text-xs uppercase transition-all flex items-center justify-center gap-2">
+                                    <button type="submit" class="bg-amber-500 hover:bg-amber-600 text-white px-8 py-4 rounded-xl font-black text-xs uppercase tracking-widest transition-all transform hover:-translate-y-0.5 shadow-lg shadow-amber-200/50 flex items-center justify-center gap-2">
                                         <i data-lucide="save" class="w-4 h-4"></i> Adicionar Despacho
                                     </button>
                                 </div>
                             </form>
 
-                            <div class="pt-6 border-t border-slate-800">
-                                <h4 class="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4">Ações de Resolução Final</h4>
-                                <div class="flex flex-wrap gap-3">
+                            <div class="pt-8 border-t border-slate-50">
+                                <h4 class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6 block text-center">Decisão Estratégica Final</h4>
+                                <div class="flex flex-wrap items-center justify-center gap-4">
                                     <form method="post"> {% csrf_token %} <input type="hidden" name="action" value="aprovado">
-                                        <button type="submit" class="inline-flex items-center gap-2 px-6 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-bold text-xs uppercase shadow-lg shadow-emerald-500/20 transition-all">
-                                            <i data-lucide="check" class="w-4 h-4"></i> Aprovar
+                                        <button type="submit" class="inline-flex items-center gap-3 px-8 py-4 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-xl shadow-emerald-500/20 transition-all transform hover:-translate-y-0.5">
+                                            <i data-lucide="check-circle" class="w-4 h-4"></i> Aprovar
                                         </button>
                                     </form>
                                     <form method="post"> {% csrf_token %} <input type="hidden" name="action" value="reprovado">
-                                        <button type="submit" class="inline-flex items-center gap-2 px-6 py-2.5 bg-red-500 hover:bg-red-600 text-white rounded-xl font-bold text-xs uppercase shadow-lg shadow-red-500/20 transition-all">
-                                            <i data-lucide="x" class="w-4 h-4"></i> Reprovar
+                                        <button type="submit" class="inline-flex items-center gap-3 px-8 py-4 bg-red-500 hover:bg-red-600 text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-xl shadow-red-500/20 transition-all transform hover:-translate-y-0.5">
+                                            <i data-lucide="x-circle" class="w-4 h-4"></i> Reprovar
                                         </button>
                                     </form>
-                                    <a href="{% url 'registrar_armazenamento' documento.id %}" class="inline-flex items-center gap-2 px-6 py-2.5 bg-slate-700 hover:bg-slate-600 text-white rounded-xl font-bold text-xs uppercase transition-all">
+                                    <a href="{% url 'registrar_armazenamento' documento.id %}" class="inline-flex items-center gap-3 px-8 py-4 bg-slate-800 hover:bg-slate-900 text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-xl shadow-slate-200 transition-all transform hover:-translate-y-0.5">
                                         <i data-lucide="archive" class="w-4 h-4"></i> Armazenar
                                     </a>
-                                    <form method="post"> {% csrf_token %} <input type="hidden" name="action" value="arquivado">
-                                        <button type="submit" class="inline-flex items-center gap-2 px-6 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-bold text-xs uppercase transition-all underline decoration-slate-600">
-                                            Arquivar
-                                        </button>
-                                    </form>
                                 </div>
                             </div>
                         </div>
@@ -341,13 +340,8 @@
 
             // Estilizar inputs via JS
             document.querySelectorAll('input:not([type="hidden"]), select, textarea').forEach(el => {
-                const isDarkSubject = el.closest('.bg-slate-900');
                 if (!el.classList.contains('select2-hidden-accessible')) {
-                    if (isDarkSubject) {
-                        el.className = "block w-full px-4 py-2.5 bg-slate-800 border-transparent focus:bg-slate-700 focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 rounded-xl text-sm font-medium transition-all outline-none text-white";
-                    } else {
-                        el.className = "block w-full px-4 py-2.5 bg-slate-50 border-transparent focus:bg-white focus:ring-2 focus:ring-sga-red/20 focus:border-sga-red rounded-xl text-sm font-medium transition-all outline-none";
-                    }
+                    el.className = "block w-full px-5 py-3.5 bg-slate-50/50 border-2 border-slate-100 focus:bg-white focus:ring-4 focus:ring-sga-red/10 focus:border-red-500/40 rounded-2xl text-sm font-semibold transition-all outline-none text-slate-700 placeholder:text-slate-300";
                 }
             });
 
@@ -361,13 +355,13 @@
 
                 if (deptVal) {
                     $seccaoSelect.prop('disabled', true);
-                    $seccaoSelect.next('.select2-container').css('opacity', '0.4');
+                    $seccaoSelect.next('.select2-container').css('opacity', '0.2').css('pointer-events', 'none');
                 } else if (seccaoVal) {
                     $deptSelect.prop('disabled', true);
-                    $deptSelect.next('.select2-container').css('opacity', '0.4');
+                    $deptSelect.next('.select2-container').css('opacity', '0.2').css('pointer-events', 'none');
                 } else {
-                    $deptSelect.prop('disabled', false).next('.select2-container').css('opacity', '1');
-                    $seccaoSelect.prop('disabled', false).next('.select2-container').css('opacity', '1');
+                    $deptSelect.prop('disabled', false).next('.select2-container').css('opacity', '1').css('pointer-events', 'auto');
+                    $seccaoSelect.prop('disabled', false).next('.select2-container').css('opacity', '1').css('pointer-events', 'auto');
                 }
             }
 
@@ -378,63 +372,55 @@
                     width: '100%'
                 }).on('change', handleExclusivity);
 
-                // CSS customizado para Select2 (Aurora Premium)
+                // CSS customizado para Select2 (Aurora Premium Light)
                 $("<style>").prop("type", "text/css").html(`
-                    /* Global Select2 Aurora Styles */
                     .select2-container--default .select2-selection--single {
-                        background-color: #ffffff;
+                        background-color: #f8fafc;
                         border: 2px solid #f1f5f9;
-                        border-radius: 12px;
-                        height: 48px;
-                        padding: 8px 12px;
+                        border-radius: 18px;
+                        height: 60px;
+                        padding: 10px 18px;
                         transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+                        display: flex;
+                        align-items: center;
                     }
                     .select2-container--default.select2-container--focus .select2-selection--single {
-                        border-color: #c8102e;
+                        border-color: rgba(200, 16, 46, 0.4);
                         background-color: #ffffff;
-                        box-shadow: 0 0 0 4px rgba(200, 16, 46, 0.05);
+                        box-shadow: 0 0 0 6px rgba(200, 16, 46, 0.04);
                     }
                     .select2-container--default .select2-selection--single .select2-selection__rendered {
-                        color: #0f172a;
-                        font-weight: 600;
-                        font-size: 0.875rem;
+                        color: #1e293b;
+                        font-weight: 800;
+                        font-size: 0.938rem;
                         line-height: normal;
+                        padding-left: 0;
                     }
                     .select2-container--default .select2-selection--single .select2-selection__arrow {
-                        height: 46px;
-                        right: 12px;
+                        height: 56px;
+                        right: 16px;
                     }
                     
-                    /* Dark Context Select2 (Despacho) */
-                    .bg-slate-900 .select2-container--default .select2-selection--single {
-                        background-color: #1e293b;
-                        border-color: #334155;
-                    }
-                    .bg-slate-900 .select2-container--default .select2-selection--single .select2-selection__rendered {
-                        color: #f8fafc;
-                    }
-                    .bg-slate-900 .select2-container--default.select2-container--focus .select2-selection--single {
-                        border-color: #f59e0b;
-                        box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.1);
-                    }
-
                     /* Dropdown Results */
                     .select2-dropdown {
-                        border: none;
-                        border-radius: 16px;
-                        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+                        border: 1px solid #f1f5f9;
+                        border-radius: 20px;
+                        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15);
                         margin-top: 8px;
                         overflow: hidden;
+                        padding: 8px;
                     }
                     .select2-results__option--highlighted[aria-selected] {
                         background-color: #fef2f2 !important;
                         color: #c8102e !important;
+                        border-radius: 12px;
                     }
                     .select2-results__option {
-                        padding: 10px 16px;
-                        font-size: 0.875rem;
-                        font-weight: 500;
+                        padding: 14px 20px;
+                        font-size: 0.9rem;
+                        font-weight: 700;
                         color: #475569;
+                        margin-bottom: 4px;
                     }
                 `).appendTo("head");
 
