@@ -90,7 +90,13 @@ class MovimentacaoDocumento(models.Model):
         # Garante que origem e destino pertencem à mesma administração do documento,
         # EXCETO: Se for comunicação Governo Provincial <-> Administração Municipal (mesma província)
         
-        admin_documento = getattr(self.documento, 'administracao', None) if self.documento else None
+        # CORREÇÃO: Usar a administração de ORIGEM DA MOVIMENTAÇÃO, não do documento original.
+        # Isso permite fluxos como MAT -> Gov -> Mun.
+        admin_origem_mov = None
+        if self.departamento_origem and self.departamento_origem.administracao:
+            admin_origem_mov = self.departamento_origem.administracao
+        else:
+            admin_origem_mov = getattr(self.documento, 'administracao', None) if self.documento else None
         
         def validar_admin_cruzada(admin_origem, admin_destino):
             """
@@ -130,7 +136,7 @@ class MovimentacaoDocumento(models.Model):
 
         # Validar departamento de destino
         if self.departamento_destino and self.departamento_destino.administracao:
-            if admin_documento and not validar_admin_cruzada(admin_documento, self.departamento_destino.administracao):
+            if admin_origem_mov and not validar_admin_cruzada(admin_origem_mov, self.departamento_destino.administracao):
                 raise ValidationError({
                     'departamento_destino': f'O departamento de destino "{self.departamento_destino.nome}" pertence a outra administração ({self.departamento_destino.administracao.nome}).'
                 })
@@ -138,7 +144,7 @@ class MovimentacaoDocumento(models.Model):
         # Validar secção de destino (herda administração via departamento)
         if self.seccao_destino:
             admin_seccao = getattr(self.seccao_destino, 'administracao', None)
-            if admin_documento and admin_seccao and not validar_admin_cruzada(admin_documento, admin_seccao):
+            if admin_origem_mov and admin_seccao and not validar_admin_cruzada(admin_origem_mov, admin_seccao):
                 raise ValidationError({
                     'seccao_destino': f'A secção de destino "{self.seccao_destino.nome}" pertence a outra administração ({admin_seccao.nome}).'
                 })
