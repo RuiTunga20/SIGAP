@@ -27,7 +27,16 @@ class DocumentoManager(SoftDeleteManager):
                 return qs.none()
             
             # Filtramos pelo campo direto no documento para garantir isolamento Multi-Tenant
-            qs = qs.filter(administracao=user.administracao)
+            # MAS: Permitimos ver se:
+            # 1. O documento pertence à minha administração (Origem)
+            # 2. O documento está atualmente na minha administração (Destino Atual)
+            # 3. O documento já tramitou pela minha administração (Histórico)
+            qs = qs.filter(
+                Q(administracao=user.administracao) | 
+                Q(departamento_atual__administracao=user.administracao) |
+                Q(movimentacoes__departamento_destino__administracao=user.administracao) |
+                Q(movimentacoes__seccao_destino__departamento__administracao=user.administracao)
+            ).distinct()
 
         # 1. Admins da Administração veem tudo da sua admin
         niveis_admin = ['admin_sistema', 'admin_municipal', 'admin', 'diretor', 'diretor_municipal']
