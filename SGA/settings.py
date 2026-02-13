@@ -101,7 +101,7 @@ ASGI_APPLICATION = 'SGA.asgi.application'
 # =============================================================================
 
 # Redis URL para Channel Layer
-REDIS_URL = os.environ.get('REDIS_URL', 'redis://redis:6379/0')
+REDIS_URL = os.environ.get('REDIS_URL', 'redis://red-d65mrnp4tr6s73d5gk80:6379')
 
 CHANNEL_LAYERS = {
     "default": {
