@@ -10,6 +10,7 @@ pip install -r requirements.txt
 # O WhiteNoise vai comprimir e preparar os arquivos aqui
 python manage.py collectstatic --no-input
 
+python manage.py makemigrations
 # Aplicar migrações do banco de dados
 python manage.py migrate
 
