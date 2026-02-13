@@ -191,61 +191,58 @@
                 });
             });
 
-            // Ativar Select2 com tema customizado
+            // Ativar Select2 com tema customizado (Pixel Perfect)
             $(document).ready(function() {
                 $('select').select2({
-                    placeholder: 'Selecione uma opção...',
+                    placeholder: 'Escolha uma opção...',
                     width: '100%',
-                    containerCssClass: 'sga-select2-container'
+                    minimumResultsForSearch: 8
                 });
-                
-                // Aplicar estilos SGA à estrutura do Select2 via CSS injetado
-                const style = document.createElement('style');
-                style.innerHTML = `
+
+                // Injetar Estilos Select2 (Aurora Premium Light - PIXEL PERFECT)
+                $("<style>").prop("type", "text/css").html(`
                     .select2-container--default .select2-selection--single {
                         background-color: #f8fafc;
-                        border: 2px solid transparent;
-                        border-radius: 12px;
-                        height: 44px;
-                        padding: 6px 12px;
-                        transition: all 0.2s;
+                        border: 2px solid #f1f5f9;
+                        border-radius: 16px;
+                        height: 60px !important;
+                        display: flex;
+                        align-items: center;
+                        padding: 0 18px;
+                        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+                        box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.05);
                     }
                     .select2-container--default.select2-container--focus .select2-selection--single {
-                        background-color: white;
-                        border-color: #c8102e;
-                        box-shadow: 0 0 0 4px rgba(200, 16, 46, 0.1);
+                        border-color: rgba(200, 16, 46, 0.4);
+                        background-color: #ffffff;
+                        box-shadow: 0 0 0 6px rgba(200, 16, 46, 0.04), inset 0 2px 4px 0 rgba(0, 0, 0, 0.02);
                     }
                     .select2-container--default .select2-selection--single .select2-selection__rendered {
                         color: #1e293b;
-                        font-family: inherit;
-                        font-weight: 500;
-                        font-size: 0.875rem;
-                        line-height: normal;
+                        font-weight: 800;
+                        font-size: 0.9rem;
+                        line-height: 60px; /* Alinhamento Central */
                         padding-left: 0;
+                        padding-right: 20px;
+                        width: 100%;
                     }
                     .select2-container--default .select2-selection--single .select2-selection__arrow {
-                        height: 40px;
-                        right: 10px;
+                        height: 60px;
+                        right: 16px;
+                    }
+                    .select2-container--default .select2-selection--single .select2-selection__arrow b {
+                        border-color: #94a3b8 transparent transparent transparent;
+                        border-width: 6px 5px 0 5px;
+                        margin-top: -3px;
                     }
                     .select2-dropdown {
-                        border: none;
-                        border-radius: 12px;
-                        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-                        margin-top: 5px;
-                        padding: 4px;
-                    }
-                    .select2-search--dropdown .select2-search__field {
-                        background-color: #f1f5f9;
-                        border: none;
-                        border-radius: 8px;
-                        padding: 8px 12px;
-                    }
-                    .select2-results__option {
-                        border-radius: 6px;
-                        padding: 8px 12px;
-                        font-size: 0.875rem;
-                        font-weight: 500;
-                        color: #475569;
+                        border: 1px solid #f1f5f9;
+                        border-radius: 20px;
+                        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15);
+                        margin-top: 8px;
+                        overflow: hidden;
+                        padding: 8px;
+                        z-index: 9999;
                     }
                     .select2-results__option--highlighted[aria-selected] {
                         background-color: #fef2f2 !important;

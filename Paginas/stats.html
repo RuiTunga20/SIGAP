@@ -24,18 +24,15 @@
     </div>
 
     <!-- Despachados -->
-    <div class="group bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-xl hover:shadow-red-100/50 transition-all duration-300 transform hover:-translate-y-1 overflow-hidden relative">
-        <div class="absolute top-0 right-0 w-16 h-16 bg-red-50 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110"></div>
-        <div class="relative">
-            <div class="flex items-center justify-between mb-4">
-                <div class="p-3 bg-red-50 text-sga-red rounded-2xl group-hover:bg-sga-red group-hover:text-white transition-colors">
-                    <i data-lucide="check-circle" class="w-5 h-5"></i>
-                </div>
-                <span class="text-[10px] font-black text-slate-300 uppercase tracking-widest">Finalizados</span>
+    <div class="group bg-slate-900 p-6 rounded-[2rem] border border-slate-800 shadow-2xl hover:bg-black transition-all duration-300 transform hover:-translate-y-1">
+        <div class="flex items-center justify-between mb-4">
+            <div class="p-3 bg-sga-red/20 text-sga-red rounded-2xl">
+                <i data-lucide="check-circle" class="w-5 h-5"></i>
             </div>
-            <div class="text-3xl font-black text-slate-800 tracking-tight mb-1">{{ dados.com_despacho }}</div>
-            <div class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Despachos Emitidos</div>
+            <span class="text-[10px] font-black text-slate-500 uppercase tracking-widest">Finalizados</span>
         </div>
+        <div class="text-3xl font-black text-white tracking-tight mb-1">{{ dados.com_despacho }}</div>
+        <div class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Despachos Emitidos</div>
     </div>
 </div>
 

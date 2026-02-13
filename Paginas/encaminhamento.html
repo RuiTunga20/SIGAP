@@ -32,66 +32,62 @@
                 </div>
             </div>
 
-            <form class="p-10 space-y-10" method="post">
+            <form class="p-10 space-y-8" method="post">
                 {% csrf_token %}
                 
-                <div class="space-y-3">
-                    <label class="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] block ml-1">Modalidade de Envio</label>
+                <div class="space-y-2">
+                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest block ml-1">Modalidade de Envio</label>
                     <div class="relative group">
                         {{ form.tipo_movimentacao }}
                     </div>
                 </div>
 
-                <div class="p-8 bg-slate-50/50 rounded-[2rem] border border-slate-100 space-y-8 shadow-sm relative overflow-hidden">
-                    <div class="absolute top-0 left-0 w-1.5 h-full bg-sga-red/20"></div>
-                    
-                    <div class="flex items-center gap-2 mb-4 px-2">
-                        <div class="w-2.5 h-2.5 rounded-full bg-sga-red/60 animate-pulse"></div>
+                <div class="p-8 bg-slate-50/50 rounded-3xl border border-slate-100 space-y-6 shadow-inner">
+                    <div class="flex items-center gap-2 mb-2 px-2">
+                        <i data-lucide="map-pin" class="w-4 h-4 text-sga-red"></i>
                         <span class="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Destinação Oficial</span>
                     </div>
 
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-10 p-2">
-                        <div class="space-y-3 group/field">
-                            <label class="text-[10px] font-black text-slate-500 uppercase tracking-widest block ml-1 transition-colors group-focus-within/field:text-sga-red">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8 p-1">
+                        <div class="space-y-2 group/field">
+                            <label class="text-[10px] font-bold text-slate-500 uppercase tracking-wider block ml-1 transition-colors group-focus-within/field:text-sga-red">
                                 {{ form.departamento_destino.label }}
                             </label>
                             {{ form.departamento_destino }}
-                            <p class="form-help text-[9px] text-slate-400 font-bold italic mt-2.5 px-1 tracking-wide">Gabinete Central</p>
+                            <p class="form-help text-[9px] text-slate-400 font-bold italic mt-2 px-1">Gabinete Central</p>
                             {% if form.departamento_destino.errors %}
                                 <div class="text-[10px] text-red-500 font-bold mt-1 px-1">{{ form.departamento_destino.errors }}</div>
                             {% endif %}
                         </div>
 
-                        <div class="space-y-3 group/field">
-                            <label class="text-[10px] font-black text-slate-500 uppercase tracking-widest block ml-1 transition-colors group-focus-within/field:text-emerald-600">
+                        <div class="space-y-2 group/field">
+                            <label class="text-[10px] font-bold text-slate-500 uppercase tracking-wider block ml-1 transition-colors group-focus-within/field:text-emerald-600">
                                 {{ form.seccao_destino.label }}
                             </label>
                             {{ form.seccao_destino }}
-                            <p class="form-help text-[9px] text-slate-400 font-bold italic mt-2.5 px-1 tracking-wide">Secção Especializada</p>
+                            <p class="form-help text-[9px] text-slate-400 font-bold italic mt-2 px-1">Secção Especializada</p>
                             {% if form.seccao_destino.errors %}
                                 <div class="text-[10px] text-red-500 font-bold mt-1 px-1">{{ form.seccao_destino.errors }}</div>
                             {% endif %}
                         </div>
                     </div>
                     
-                    <div class="px-2 pt-2">
-                        <div class="flex items-center gap-4 p-5 bg-white rounded-2xl border border-slate-100 shadow-sm border-l-4 border-l-red-100">
-                            <div class="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center flex-shrink-0">
-                                <i data-lucide="info" class="w-5 h-5 text-sga-red"></i>
-                            </div>
-                            <p class="text-[11px] text-slate-500 leading-relaxed font-semibold">
-                                Seleccione <span class="text-sga-red font-black">apenas um</span> destino. O sistema prioriza a unidade técnica quando ambos são preenchidos.
+                    <div class="px-2 pb-2">
+                        <div class="flex items-center gap-3 p-4 bg-white/50 rounded-2xl border border-slate-200/50">
+                            <i data-lucide="info" class="w-4 h-4 text-sga-red flex-shrink-0"></i>
+                            <p class="text-[10px] text-slate-500 leading-relaxed font-medium">
+                                Seleccione <span class="text-slate-800 font-bold">apenas um</span> destino. O sistema prioriza a unidade técnica quando ambos são preenchidos.
                             </p>
                         </div>
                     </div>
                 </div>
 
-                <div class="space-y-3">
+                <div class="space-y-2">
                     <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest block ml-1">Observações / Parecer Técnico</label>
                     <div class="relative">
                          {{ form.observacoes }}
-                         <div class="absolute right-4 bottom-4 pointer-events-none opacity-20 group-focus-within:opacity-40 transition-opacity">
-                             <i data-lucide="pen-tool" class="w-6 h-6"></i>
+                         <div class="absolute right-4 bottom-4 pointer-events-none opacity-20">
+                             <i data-lucide="pen-tool" class="w-5 h-5"></i>
                          </div>
                     </div>
                     {% if form.observacoes.errors %}
@@ -99,9 +95,9 @@
                     {% endif %}
                 </div>
 
-                <div class="pt-10 border-t border-slate-50 flex flex-col md:flex-row gap-5">
-                    <button type="submit" class="flex-1 bg-sga-red hover:bg-red-700 text-white py-5 rounded-2xl font-black text-xs uppercase tracking-[0.2em] transition-all transform hover:-translate-y-1 active:translate-y-0.5 shadow-2xl shadow-red-200/60 flex items-center justify-center gap-3">
-                        <i data-lucide="check-circle" class="w-5 h-5"></i>
+                <div class="pt-6 border-t border-slate-50 flex flex-col md:flex-row gap-4">
+                    <button type="submit" class="flex-1 bg-sga-red hover:bg-red-700 text-white py-5 rounded-2xl font-black text-xs uppercase tracking-widest transition-all transform active:scale-[0.98] shadow-2xl shadow-red-200/50 flex items-center justify-center gap-3">
+                        <i data-lucide="send" class="w-4 h-4"></i>
                         Confirmar Reencaminhamento
                     </button>
                     <button type="button" onclick="window.history.back()" class="md:w-48 bg-slate-100 hover:bg-slate-200 text-slate-600 py-5 rounded-2xl font-black text-xs uppercase tracking-widest transition-all">
@@ -125,7 +121,7 @@
             // Estilizar inputs via JS (Aurora Light Theme)
             document.querySelectorAll('input:not([type="hidden"]), select, textarea').forEach(el => {
                 if (!el.classList.contains('select2-hidden-accessible')) {
-                    el.className = "block w-full px-6 py-5 bg-slate-50 border-2 border-slate-100/50 focus:bg-white focus:ring-4 focus:ring-sga-red/10 focus:border-red-500/30 rounded-2xl text-sm font-bold transition-all outline-none text-slate-700 placeholder:text-slate-300 shadow-inner";
+                    el.className = "block w-full h-[60px] px-6 py-4 bg-slate-50 border-2 border-slate-100/50 focus:bg-white focus:ring-4 focus:ring-sga-red/10 focus:border-red-500/30 rounded-2xl text-sm font-bold transition-all outline-none text-slate-700 placeholder:text-slate-300 shadow-inner appearance-none";
                 }
             });
 
@@ -137,29 +133,32 @@
                     minimumResultsForSearch: 10
                 });
 
-                // CSS customizado para Select2 (Aurora Premium Light - FIXED)
+                // CSS customizado para Select2 (Aurora Premium Light - PIXEL PERFECT)
                 $("<style>").prop("type", "text/css").html(`
                     .select2-container--default .select2-selection--single {
                         background-color: #f8fafc;
                         border: 2px solid #f1f5f9;
-                        border-radius: 18px;
-                        height: 64px;
-                        padding: 10px 18px;
-                        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+                        border-radius: 16px;
+                        height: 60px !important;
                         display: flex;
                         align-items: center;
+                        padding: 0 18px;
+                        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+                        box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.05);
                     }
                     .select2-container--default.select2-container--focus .select2-selection--single {
                         border-color: rgba(200, 16, 46, 0.4);
                         background-color: #ffffff;
-                        box-shadow: 0 0 0 6px rgba(200, 16, 46, 0.04);
+                        box-shadow: 0 0 0 6px rgba(200, 16, 46, 0.04), inset 0 2px 4px 0 rgba(0, 0, 0, 0.02);
                     }
                     .select2-container--default .select2-selection--single .select2-selection__rendered {
                         color: #1e293b;
                         font-weight: 800;
-                        font-size: 0.938rem;
-                        line-height: normal;
+                        font-size: 0.9rem;
+                        line-height: 60px; /* Vertically center text */
                         padding-left: 0;
+                        padding-right: 20px;
+                        width: 100%;
                     }
                     .select2-container--default .select2-selection--single .select2-selection__placeholder {
                         color: #94a3b8;
@@ -172,49 +171,42 @@
                     .select2-container--default .select2-selection--single .select2-selection__arrow b {
                         border-color: #94a3b8 transparent transparent transparent;
                         border-width: 6px 5px 0 5px;
+                        margin-top: -3px;
                     }
                     
                     /* Dropdown Results */
                     .select2-dropdown {
                         border: 1px solid #f1f5f9;
-                        border-radius: 24px;
+                        border-radius: 20px;
                         box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15);
-                        margin-top: 10px;
+                        margin-top: 8px;
                         overflow: hidden;
-                        padding: 10px;
+                        padding: 8px;
                         z-index: 9999;
                     }
                     .select2-search--dropdown {
-                        padding: 8px 12px 12px;
+                        padding: 8px;
                     }
                     .select2-search--dropdown .select2-search__field {
                         border: 2px solid #f1f5f9;
-                        border-radius: 14px;
-                        padding: 12px 16px;
+                        border-radius: 12px;
+                        padding: 10px 14px;
                         font-family: inherit;
                         outline: none;
                         background: #f8fafc;
                         font-weight: 600;
                     }
-                    .select2-search--dropdown .select2-search__field:focus {
-                        border-color: #c8102e;
-                        background: #fff;
-                    }
                     .select2-results__option--highlighted[aria-selected] {
                         background-color: #fef2f2 !important;
                         color: #c8102e !important;
-                        border-radius: 14px;
+                        border-radius: 12px;
                     }
                     .select2-results__option {
-                        padding: 14px 20px;
-                        font-size: 0.9rem;
+                        padding: 12px 16px;
+                        font-size: 0.875rem;
                         font-weight: 700;
                         color: #475569;
-                        margin-bottom: 6px;
-                    }
-                    .select2-results__option[aria-selected="true"] {
-                        background-color: #f1f5f9;
-                        border-radius: 14px;
+                        margin-bottom: 4px;
                     }
                 `).appendTo("head");
 
