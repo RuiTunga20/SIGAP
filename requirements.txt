@@ -1,0 +1,32 @@
+# Django e Core
+Django==4.2.11
+asgiref==3.7.2
+sqlparse==0.4.4
+
+# Django Channels (WebSockets/ASGI)
+channels==4.0.0
+channels-redis==4.2.0
+daphne==4.1.0
+
+# Base de Dados
+psycopg2-binary==2.9.10
+
+# Redis
+redis==5.0.1
+
+# Utilitários
+pillow==11.0.0
+python-dateutil==2.8.2
+
+# WSGI Server (backup)
+gunicorn==21.2.0
+
+# Ambiente
+python-dotenv==1.0.1
+django-redis==5.4.0
+
+# Arquivos Estáticos
+whitenoise[brotli]==6.6.0
+
+# PDF Generation
+reportlab==4.1.0

@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="h-full bg-slate-50">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestão de Utilizadores - SGA Aurora</title>
+    <!-- Select2 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+</head>
+<body class="h-full">
+    {% include "menu.html" %}
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+        
+        <!-- Header da Página -->
+        <div class="mb-8 overflow-hidden">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-4">
+                    <div class="p-3 bg-white rounded-2xl shadow-sm border border-slate-100">
+                        <i data-lucide="users" class="w-8 h-8 text-sga-red"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-3xl font-extrabold text-slate-800 tracking-tight font-display">Controle de Utilizadores</h2>
+                        <p class="text-slate-500 font-medium text-sm">
+                            Administração de acessos para <span class="text-sga-red font-bold">{{ administracao.nome }}</span>
+                        </p>
+                    </div>
+                </div>
+                <div class="text-right hidden md:block">
+                    <span class="text-4xl font-black text-slate-200 leading-none">{{ usuarios.count }}</span>
+                    <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">Contas Ativas</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+            
+            <!-- Formulário de Criação (5/12) -->
+            <div class="lg:col-span-5">
+                <div class="bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-100 overflow-hidden sticky top-28">
+                    <div class="px-8 py-6 border-b border-slate-50 bg-slate-50/50">
+                        <div class="flex items-center gap-2">
+                            <i data-lucide="user-plus" class="w-4 h-4 text-emerald-500"></i>
+                            <h3 class="text-xs font-black uppercase tracking-widest text-slate-500">Novo Registro de Acesso</h3>
+                        </div>
+                    </div>
+                    
+                    <form method="post" id="formCriarUsuario" class="p-8 space-y-6">
+                        {% csrf_token %}
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="space-y-1.5">
+                                <label class="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-1">Nome de Utilizador</label>
+                                {{ form.username }}
+                                {% if form.username.errors %}<p class="text-[10px] text-red-500 font-bold mt-1">{{ form.username.errors.0 }}</p>{% endif %}
+                            </div>
+                            <div class="space-y-1.5">
+                                <label class="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-1">E-mail Corporativo</label>
+                                {{ form.email }}
+                                {% if form.email.errors %}<p class="text-[10px] text-red-500 font-bold mt-1">{{ form.email.errors.0 }}</p>{% endif %}
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="space-y-1.5">
+                                <label class="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-1">Primeiro Nome</label>
+                                {{ form.first_name }}
+                            </div>
+                            <div class="space-y-1.5">
+                                <label class="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-1">Sobrenome</label>
+                                {{ form.last_name }}
+                            </div>
+                        </div>
+
+                        <div class="space-y-1.5">
+                            <label class="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-1">Nível de Hierarquia / Acesso</label>
+                            {{ form.nivel_acesso }}
+                        </div>
+
+                        <div class="space-y-4 pt-4 border-t border-slate-50">
+                            <div class="space-y-1.5">
+                                <label class="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-1">Departamento</label>
+                                {{ form.departamento }}
+                            </div>
+                            <div class="space-y-1.5" id="seccao-container">
+                                <label class="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-1">Secção Específica (Opcional)</label>
+                                {{ form.seccao }}
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50 p-4 rounded-2xl">
+                            <div class="space-y-1.5">
+                                <label class="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-1">Definir Senha</label>
+                                {{ form.password1 }}
+                                {% if form.password1.errors %}<p class="text-[10px] text-red-500 font-bold mt-1">{{ form.password1.errors.0 }}</p>{% endif %}
+                            </div>
+                            <div class="space-y-1.5">
+                                <label class="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-1">Confirmar Senha</label>
+                                {{ form.password2 }}
+                            </div>
+                        </div>
+
+                        <button type="submit" class="w-full bg-slate-900 border border-slate-800 text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-black transition-all shadow-xl shadow-slate-200">
+                            Activar Conta de Utilizador
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Listagem de Usuários (7/12) -->
+            <div class="lg:col-span-7 bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+                <div class="px-8 py-6 border-b border-slate-100 flex items-center justify-between bg-white sticky top-28 z-20">
+                    <h3 class="text-xs font-black uppercase tracking-widest text-slate-500">Utilizadores Activos</h3>
+                    <div class="flex items-center gap-2">
+                         <span class="text-[10px] font-bold text-slate-400">Total: {{ usuarios.count }}</span>
+                    </div>
+                </div>
+                
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left">
+                        <thead>
+                            <tr class="bg-slate-50/50">
+                                <th class="px-8 py-4 text-[10px] font-black uppercase tracking-wider text-slate-400">Identificação</th>
+                                <th class="px-8 py-4 text-[10px] font-black uppercase tracking-wider text-slate-400">Localização</th>
+                                <th class="px-8 py-4 text-[10px] font-black uppercase tracking-wider text-slate-400 text-right">Permissões</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-50">
+                            {% for u in usuarios %}
+                            <tr class="group hover:bg-slate-50/80 transition-all duration-200">
+                                <td class="px-8 py-6">
+                                    <div class="flex items-center gap-4">
+                                        <div class="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-400 font-black text-sm uppercase ring-4 ring-white shadow-sm transition-all group-hover:bg-sga-red group-hover:text-white">
+                                            {{ u.username|slice:":2" }}
+                                        </div>
+                                        <div class="flex flex-col">
+                                            <span class="text-sm font-bold text-slate-800">{{ u.first_name }} {{ u.last_name }}</span>
+                                            <span class="text-[11px] font-medium text-slate-400">@{{ u.username }}</span>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="px-8 py-6">
+                                    <div class="flex flex-col">
+                                        {% if u.departamento %}
+                                            <span class="text-xs font-bold text-slate-600">{{ u.departamento.nome|default:"Acesso Global" }}</span>
+                                        {% else %}
+                                            <span class="text-xs font-bold text-slate-600">Acesso Global</span>
+                                        {% endif %}
+                                        {% if u.seccao %}
+                                            <span class="text-[10px] text-sga-red font-bold uppercase tracking-tighter mt-0.5">{{ u.seccao.nome }}</span>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                                <td class="px-8 py-6 text-right">
+                                    <span class="inline-flex items-center px-2.5 py-1 rounded-md text-[9px] font-black uppercase tracking-widest shadow-sm ring-1 ring-inset
+                                        {% if 'admin' in u.nivel_acesso %}bg-red-50 text-red-700 ring-red-100
+                                        {% elif 'diretor' in u.nivel_acesso %}bg-amber-50 text-amber-700 ring-amber-100
+                                        {% elif 'tecnico' in u.nivel_acesso %}bg-blue-50 text-blue-700 ring-blue-100
+                                        {% else %}bg-slate-50 text-slate-600 ring-slate-100{% endif %}">
+                                        {{ u.get_nivel_acesso_display|default:u.nivel_acesso }}
+                                    </span>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="3" class="px-8 py-12 text-center">
+                                    <i data-lucide="shield-alert" class="w-10 h-10 text-slate-100 mx-auto mb-3"></i>
+                                    <p class="text-xs text-slate-400 font-medium">Nenhum utilizador registado nesta administração.</p>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Inicializar Lucide
+            if (window.lucide) { lucide.createIcons(); }
+
+            // Estilizar inputs via JS
+            document.querySelectorAll('input:not([type="hidden"]), select').forEach(el => {
+                if (!el.classList.contains('select2-hidden-accessible')) {
+                    el.className = "block w-full px-4 py-3 bg-slate-50 border-2 border-transparent focus:bg-white focus:ring-4 focus:ring-sga-red/5 focus:border-sga-red/30 rounded-2xl text-sm font-semibold transition-all outline-none";
+                }
+            });
+
+            // Inicializar Select2 com Tema Aurora
+            $(document).ready(function() {
+                $('select').select2({
+                    placeholder: 'Escolha uma opção...',
+                    width: '100%'
+                });
+
+                // Injetar Estilos Select2
+                // CSS customizado para Select2 (Aurora Premium)
+                $("<style>").prop("type", "text/css").html(`
+                    /* Global Select2 Aurora Styles */
+                    .select2-container--default .select2-selection--single {
+                        background-color: #ffffff;
+                        border: 2px solid #f1f5f9;
+                        border-radius: 12px;
+                        height: 48px;
+                        padding: 8px 12px;
+                        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+                    }
+                    .select2-container--default.select2-container--focus .select2-selection--single {
+                        border-color: #c8102e;
+                        background-color: #ffffff;
+                        box-shadow: 0 0 0 4px rgba(200, 16, 46, 0.05);
+                    }
+                    .select2-container--default .select2-selection--single .select2-selection__rendered {
+                        color: #0f172a;
+                        font-weight: 600;
+                        font-size: 0.875rem;
+                        line-height: normal;
+                    }
+                    .select2-container--default .select2-selection--single .select2-selection__arrow {
+                        height: 46px;
+                        right: 12px;
+                    }
+                    
+                    /* Dropdown Results */
+                    .select2-dropdown {
+                        border: none;
+                        border-radius: 16px;
+                        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+                        margin-top: 8px;
+                        overflow: hidden;
+                    }
+                    .select2-results__option--highlighted[aria-selected] {
+                        background-color: #fef2f2 !important;
+                        color: #c8102e !important;
+                    }
+                    .select2-results__option {
+                        padding: 10px 16px;
+                        font-size: 0.875rem;
+                        font-weight: 500;
+                        color: #475569;
+                    }
+                `).appendTo("head");
+
+                // Lógica de Filtragem Dinâmica (AJAX)
+                $('#id_departamento').on('change', function() {
+                    const deptId = $(this).val();
+                    const seccaoSelect = $('#id_seccao');
+                    const seccaoContainer = $('#seccao-container');
+                    
+                    seccaoSelect.empty().append('<option value="">Seleccione a Secção...</option>');
+                    
+                    if (deptId) {
+                        seccaoContainer.css('opacity', '0.5');
+                        fetch(`/ajax/seccoes-departamento/?departamento_id=${deptId}`)
+                            .then(response => response.json())
+                            .then(data => {
+                                if (data.seccoes.length > 0) {
+                                    data.seccoes.forEach(sec => {
+                                        seccaoSelect.append(new Option(sec.nome, sec.id, false, false));
+                                    });
+                                    seccaoContainer.show().css('opacity', '1');
+                                } else {
+                                    seccaoContainer.hide();
+                                }
+                                seccaoSelect.trigger('change');
+                            })
+                            .catch(err => console.error('Erro AJAX:', err));
+                    } else {
+                        seccaoSelect.trigger('change');
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

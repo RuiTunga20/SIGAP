@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="h-full bg-slate-50">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pendências de Recebimento - SGA Aurora</title>
+</head>
+<body class="h-full">
+    {% include "menu.html" %}
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+        
+        <!-- Header da Página -->
+        <div class="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-6">
+            <div>
+                <h2 class="text-3xl font-extrabold text-slate-800 tracking-tight font-display">
+                    Pendências de Recebimento
+                </h2>
+                <div class="flex items-center gap-2 mt-1">
+                    <span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+                    <p class="text-slate-500 font-medium text-sm italic">
+                        Aguardando confirmação de recebimento físico ou digital
+                    </p>
+                </div>
+            </div>
+            
+            <div class="flex items-center gap-2 bg-white px-4 py-2 rounded-xl shadow-sm border border-slate-100">
+                <i data-lucide="info" class="w-4 h-4 text-blue-500"></i>
+                <span class="text-[10px] font-black uppercase tracking-widest text-slate-500">
+                    Sincronização Ativa (WebSocket)
+                </span>
+            </div>
+        </div>
+
+        <!-- Filtros e Busca -->
+        <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 mb-6 flex items-center gap-4">
+            <div class="relative flex-1">
+                <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                    <i data-lucide="search" class="w-4 h-4 text-slate-400"></i>
+                </div>
+                <input 
+                    type="search" 
+                    id="table-search-input" 
+                    placeholder="Pesquisar por título, protocolo ou remetente..." 
+                    class="block w-full pl-10 pr-4 py-2.5 bg-slate-50 border-transparent focus:bg-white focus:ring-2 focus:ring-amber-200 focus:border-amber-400 rounded-xl text-sm font-medium transition-all"
+                >
+            </div>
+            <button 
+                onclick="atualizarTabelaPendencias()" 
+                class="p-2.5 text-slate-400 hover:text-sga-blue hover:bg-blue-50 rounded-xl transition-all border border-transparent hover:border-blue-100"
+                title="Atualizar agora"
+            >
+                <i data-lucide="refresh-cw" class="w-5 h-5"></i>
+            </button>
+        </div>
+
+        <!-- Tabela de Pendências -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden" id="pendencias-table-container">
+            {% include '_tabela_pendencias.html' %}
+        </div>
+
+        <div class="mt-8 p-6 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 rounded-2xl flex items-start gap-4">
+            <div class="p-2 bg-white rounded-lg shadow-sm">
+                <i data-lucide="lightbulb" class="w-5 h-5 text-blue-500"></i>
+            </div>
+            <div>
+                <h4 class="text-sm font-bold text-blue-900">Como confirmar?</h4>
+                <p class="text-xs text-blue-700 font-medium leading-relaxed mt-1">
+                    Ao confirmar o recebimento, o remetente será notificado e o documento passará a constar como "Em Posse" do seu departamento.
+                    Utilize o botão "Analisar" para carregar os detalhes e realizar a confirmação.
+                </p>
+            </div>
+        </div>
+    </main>
+
+   <script>
+        function aplicarFiltroDeBusca() {
+            const searchInput = document.getElementById('table-search-input');
+            const tableRows = document.querySelectorAll('#documents-table-body tr');
+
+            if (searchInput) {
+                const searchTerm = searchInput.value.toLowerCase().trim();
+                tableRows.forEach(row => {
+                    if (row.querySelector('td[colspan]')) return;
+                    const rowText = row.textContent.toLowerCase();
+                    row.style.display = rowText.includes(searchTerm) ? "" : "none";
+                });
+            }
+        }
+
+        function atualizarTabelaPendencias() {
+            const pendenciasContainer = document.getElementById('pendencias-table-container');
+            if (!pendenciasContainer) return;
+
+            // Feedback visual de carregamento
+            pendenciasContainer.style.opacity = '0.5';
+            
+            fetch("{% url 'lista_pendencias_parcial' %}")
+                .then(response => response.text())
+                .then(html => {
+                    pendenciasContainer.innerHTML = html;
+                    pendenciasContainer.style.opacity = '1';
+                    aplicarFiltroDeBusca();
+                    if (window.lucide) lucide.createIcons();
+                })
+                .catch(error => {
+                    console.error("Erro ao atualizar pendências:", error);
+                    pendenciasContainer.style.opacity = '1';
+                });
+        }
+
+        window.addEventListener('pendenciasAtualizadas', function() {
+            atualizarTabelaPendencias();
+        });
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const searchInput = document.getElementById('table-search-input');
+            if (searchInput) {
+                searchInput.addEventListener('input', aplicarFiltroDeBusca);
+            }
+
+            // Polling de fallback (apenas se WebSocket não estiver disponível)
+            setTimeout(function() {
+                if (!window.notificationSocket || window.notificationSocket.readyState !== WebSocket.OPEN) {
+                    setInterval(atualizarTabelaPendencias, 60000);
+                }
+            }, 5000);
+
+            if (window.lucide) lucide.createIcons();
+        });
+   </script>
+</body>
+</html>

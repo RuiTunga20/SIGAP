@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="h-full bg-slate-50">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Movimentações - SGA Aurora</title>
+</head>
+<body class="h-full">
+    {% include "menu.html" %}
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+        
+        <!-- Header da Página -->
+        <div class="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
+            <div class="flex flex-col gap-4">
+                <div class="flex items-center gap-3">
+                    <div class="p-3 bg-white rounded-2xl shadow-sm border border-slate-100 flex-shrink-0">
+                        <i data-lucide="git-pull-request" class="w-8 h-8 text-sga-red"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-3xl font-extrabold text-slate-800 tracking-tight font-display">Documentos Recebidos</h2>
+                        <p class="text-slate-500 font-medium text-sm">Histórico de tramitações e entradas no seu departamento</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="flex items-center gap-4">
+                 <div class="relative group">
+                    <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                        <i data-lucide="search" class="w-4 h-4 text-slate-400"></i>
+                    </div>
+                    <input 
+                        type="search" 
+                        id="table-search-input" 
+                        placeholder="Pesquisar entrada..." 
+                        class="block w-64 md:w-80 pl-10 pr-4 py-2.5 bg-white border-slate-200 focus:ring-4 focus:ring-sga-red/10 focus:border-sga-red/40 rounded-2xl text-xs font-bold transition-all shadow-sm outline-none"
+                    >
+                </div>
+            </div>
+        </div>
+
+        <!-- Listagem -->
+        <div class="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+            {% if documentos %}
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-slate-50 border-b border-slate-100">
+                            <th class="px-8 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Expediente Recebido</th>
+                            <th class="px-8 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Origem / Emissor</th>
+                            <th class="px-8 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Finalidade</th>
+                            <th class="px-8 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 text-center">Anexo</th>
+                            <th class="px-8 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 text-right">Ação</th>
+                        </tr>
+                    </thead>
+                    <tbody id="documents-table-body" class="divide-y divide-slate-50">
+                        {% for documento in documentos %}
+                        <tr class="group hover:bg-slate-50/50 transition-all">
+                            <td class="px-8 py-6">
+                                <div class="flex flex-col">
+                                    <span class="text-sm font-bold text-slate-800 group-hover:text-sga-red transition-colors">{{ documento.documento.titulo|truncatechars:60 }}</span>
+                                    <span class="text-[10px] font-mono font-black text-slate-400 mt-1 uppercase tracking-wider">{{ documento.documento.numero_protocolo }}</span>
+                                </div>
+                            </td>
+                            <td class="px-8 py-6">
+                                <div class="flex items-center gap-2">
+                                    <div class="w-2 h-2 rounded-full bg-sga-red/30"></div>
+                                    <span class="text-xs font-bold text-slate-600 uppercase">{{ documento.departamento_origem }}</span>
+                                </div>
+                            </td>
+                            <td class="px-8 py-6">
+                                <span class="px-2.5 py-1 bg-slate-100 text-slate-500 rounded-md text-[10px] font-black uppercase tracking-wider">
+                                    {{ documento.tipo_movimentacao }}
+                                </span>
+                            </td>
+                            <td class="px-8 py-6 text-center">
+                                {% if documento.documento.arquivo %}
+                                    <a href="{{ documento.documento.arquivo.url }}" target="_blank" class="inline-flex items-center justify-center w-8 h-8 bg-blue-50 text-blue-500 hover:bg-blue-500 hover:text-white rounded-lg transition-all shadow-sm" title="Baixar Arquivo">
+                                        <i data-lucide="paperclip" class="w-4 h-4"></i>
+                                    </a>
+                                {% else %}
+                                    <span class="text-[10px] font-black text-slate-300 uppercase italic">Digital Offline</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-8 py-6 text-right">
+                                <div class="flex items-center justify-end gap-2">
+                                    <a href="{% url 'Encaminhar' documento.id %}" class="inline-flex items-center gap-2 px-4 py-2 bg-sga-red hover:bg-red-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-red-100 hover:-translate-y-0.5" title="Reencaminhar">
+                                        <i data-lucide="send" class="w-3.5 h-3.5"></i>
+                                        Tramitar
+                                    </a>
+                                    <a href="{% url 'detalhe_documento' documento.documento.id %}" class="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-all" title="Ver Detalhes">
+                                        <i data-lucide="eye" class="w-4 h-4"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="py-24 text-center">
+                <div class="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner ring-8 ring-slate-100/50">
+                    <i data-lucide="inbox" class="w-10 h-10 text-slate-200"></i>
+                </div>
+                <h4 class="text-lg font-black text-slate-800 mb-2 uppercase tracking-tight">Sem entradas recentes</h4>
+                <p class="text-sm text-slate-400 max-w-sm mx-auto font-medium leading-relaxed">Não há registros de movimentações recebidas para o seu departamento no momento.</p>
+            </div>
+            {% endif %}
+        </div>
+    </main>
+
+   <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            if (window.lucide) { lucide.createIcons(); }
+
+            const searchInput = document.getElementById('table-search-input');
+            const tableRows = document.querySelectorAll('#documents-table-body tr');
+
+            if (searchInput) {
+                searchInput.addEventListener('input', function(e) {
+                    const searchTerm = e.target.value.toLowerCase();
+                    tableRows.forEach(row => {
+                        const rowText = row.textContent.toLowerCase();
+                        row.style.display = rowText.includes(searchTerm) ? "" : "none";
+                    });
+                });
+            }
+        });
+    </script>
+</body>
+</html>
