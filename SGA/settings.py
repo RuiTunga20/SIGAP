@@ -22,7 +22,7 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-r#f7)g%=rdp8ld331qv3q
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', 'False').lower() in ('true', '1', 'yes')
 
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '192.168.0.213,localhost,127.0.0.1,0.0.0.0,192.168.1.191,192.168.1.192,sigap.onrender.com').split(',')
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '192.168.0.213,localhost,127.0.0.1,0.0.0.0,192.168.1.191,192.168.1.192,sigap-1.onrender.com').split(',')
 
 # CSRF Trusted Origins (para Docker/produção)
 # CSRF Trusted Origins (para Docker/produção)
@@ -34,7 +34,7 @@ CSRF_TRUSTED_ORIGINS_DEFAULT = [
     'http://192.168.1.191:8000',
     'http://192.168.1.192',
     'http://192.168.1.192:8000',
-    'https://sigap.onrender.com'
+    'https://sigap-1.onrender.com'
 ]
 CSRF_TRUSTED_ORIGINS = list(filter(None, set(CSRF_TRUSTED_ORIGINS_ENV + CSRF_TRUSTED_ORIGINS_DEFAULT)))
 
@@ -101,7 +101,7 @@ ASGI_APPLICATION = 'SGA.asgi.application'
 # =============================================================================
 
 # Redis URL para Channel Layer
-REDIS_URL = os.environ.get('REDIS_URL', 'redis://red-d65mrnp4tr6s73d5gk80:6379')
+REDIS_URL = os.environ.get('REDIS_URL', 'redis://redis:6379/0')
 
 CHANNEL_LAYERS = {
     "default": {
