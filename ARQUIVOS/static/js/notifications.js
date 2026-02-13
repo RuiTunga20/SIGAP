@@ -49,6 +49,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!id) return;
         fetch(config.markReadUrl, {
             method: 'POST',
+            keepalive: true,
             headers: {
                 'X-CSRFToken': config.csrfToken,
                 'Content-Type': 'application/json'
@@ -139,7 +140,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
                 // Show toast for new notification
                 if (data.type === 'new_notification') {
-                    mostrarToastNotificacao(data.message, data.link);
+                    // Pass notification_id to mark as read when clicked
+                    mostrarToastNotificacao(data.message, data.link, data.notification_id);
                     buscarNotificacoesViaAPI();
                 }
 
@@ -165,17 +167,25 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         // Show a toast when a new notification arrives
-        function mostrarToastNotificacao(message, link) {
+        function mostrarToastNotificacao(message, link, notificationId) {
             if (typeof Toastify === 'function') {
                 Toastify({
                     text: `🔔 ${message}`,
-                    duration: 6000,
+                    duration: 8000,
                     gravity: 'top',
                     position: 'right',
+                    close: true, // Adicionar botão de fechar
                     className: 'modern-toast',
                     stopOnFocus: true,
                     onClick: function () {
-                        if (link && link !== '#') window.location.href = link;
+                        // Mark as read if ID is provided
+                        if (notificationId) {
+                            marcarComoLida(notificationId, null);
+                        }
+
+                        if (link && link !== '#') {
+                            window.location.href = link;
+                        }
                     },
                     style: {
                         background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
@@ -183,8 +193,12 @@ document.addEventListener('DOMContentLoaded', function () {
                         boxShadow: '0 20px 25px -5px rgba(0,0,0,0.15)',
                         fontFamily: 'Inter, sans-serif',
                         fontWeight: '600',
-                        padding: '14px 20px',
-                        fontSize: '13px'
+                        padding: '16px 24px', // Aumentado para acomodar o botão X
+                        fontSize: '13px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '12px',
+                        cursor: 'pointer'
                     }
                 }).showToast();
             }

@@ -230,9 +230,10 @@
         {% for message in messages %}
             Toastify({
                 text: "{{ message }}",
-                duration: 5000,
+                duration: 8000, // Aumentado para 8 segundos para dar tempo de leitura
                 gravity: "top", 
                 position: "right", 
+                close: true, // Habilitar fecho manual
                 className: "modern-toast",
                 stopOnFocus: true,
                 style: {
@@ -240,7 +241,10 @@
                     borderRadius: "12px",
                     boxShadow: "0 10px 15px -3px rgb(0 0 0 / 0.1)",
                     fontFamily: "Inter, sans-serif",
-                    fontWeight: "600"
+                    fontWeight: "600",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "10px"
                 }
             }).showToast();
         {% endfor %}

@@ -392,6 +392,19 @@ def detalhe_documento(request, documento_id):
         id=documento_id
     )
 
+    # Limpar notificações pendentes deste documento para este usuário
+    Notificacao.objects.filter(
+        usuario=request.user,
+        lida=False,
+        link__icontains=f"documentos/detalhe/{documento_id}"
+    ).update(lida=True)
+    
+    Notificacao.objects.filter(
+        usuario=request.user,
+        lida=False,
+        link__icontains=f"documentos/{documento_id}/"
+    ).update(lida=True)
+
     # Obter localização do usuário (prioriza secção)
     user_seccao = getattr(request.user, 'seccao', None)
     user_departamento = request.user.departamento_efetivo
@@ -985,6 +998,19 @@ def encaminhar_documento(request, documento_id):
             'seccao_origem'
         ).get(id=documento_id)
         documento = movimentacao.documento
+
+        # Limpar notificações pendentes deste documento para este usuário
+        Notificacao.objects.filter(
+            usuario=request.user,
+            lida=False,
+            link__icontains=f"documentos/detalhe/{documento.id}"
+        ).update(lida=True)
+
+        Notificacao.objects.filter(
+            usuario=request.user,
+            lida=False,
+            link__icontains=f"documentos/{documento.id}/"
+        ).update(lida=True)
     except MovimentacaoDocumento.DoesNotExist:
         messages.error(request, 'Movimentação não encontrada.')
         return redirect('lista_documentos')
