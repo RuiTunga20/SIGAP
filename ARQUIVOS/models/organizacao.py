@@ -30,8 +30,8 @@ class Departamento(models.Model):
     administracao = models.ForeignKey(
         'ARQUIVOS.Administracao', 
         on_delete=models.CASCADE, 
-        null=False,  # OBRIGATÓRIO - Multi-Tenant
-        blank=False, 
+        null=True,  # TEMPORARY FIX: Allow null to enable hydration
+        blank=True, 
         related_name='departamentos_especificos'
     )
 

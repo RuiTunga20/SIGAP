@@ -103,8 +103,8 @@ class CustomUser(AbstractUser):
     administracao = models.ForeignKey(
         'Administracao',
         on_delete=models.PROTECT,  # Não pode deletar admin com usuários
-        null=False,  # OBRIGATÓRIO
-        blank=False,
+        null=True,  # TEMPORARY FIX: Allow null to enable hydration
+        blank=True,
         related_name='usuarios_administracao'
     )
     created_at = models.DateTimeField(auto_now_add=True)
