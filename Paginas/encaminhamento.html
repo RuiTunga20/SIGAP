@@ -4,6 +4,72 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Encaminhar Documento - SGA Aurora</title>
+    <!-- Select2 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    
+    <style>
+        /* Select2 Aurora Premium Theme - GLOBAL LIGHT */
+        .select2-container--default .select2-selection--single {
+            background-color: #f8fafc !important;
+            border: 2px solid #f1f5f9 !important;
+            border-radius: 16px !important;
+            height: 60px !important;
+            display: flex !important;
+            align-items: center !important;
+            padding: 0 18px !important;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+            box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.05) !important;
+        }
+        .select2-container--default.select2-container--focus .select2-selection--single {
+            border-color: rgba(200, 16, 46, 0.4) !important;
+            background-color: #ffffff !important;
+            box-shadow: 0 0 0 6px rgba(200, 16, 46, 0.04), inset 0 2px 4px 0 rgba(0, 0, 0, 0.02) !important;
+        }
+        .select2-container--default .select2-selection--single .select2-selection__rendered {
+            color: #1e293b !important;
+            font-weight: 800 !important;
+            font-size: 0.9rem !important;
+            line-height: normal !important;
+            padding-left: 0 !important;
+            width: 100% !important;
+        }
+        .select2-container--default .select2-selection--single .select2-selection__arrow {
+            height: 58px !important;
+            right: 16px !important;
+        }
+        .select2-container--default .select2-selection--single .select2-selection__arrow b {
+            border-color: #94a3b8 transparent transparent transparent !important;
+            border-width: 6px 5px 0 5px !important;
+        }
+        
+        .select2-dropdown {
+            border: 1px solid #f1f5f9 !important;
+            border-radius: 20px !important;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15) !important;
+            margin-top: 8px !important;
+            overflow: hidden !important;
+            padding: 8px !important;
+            z-index: 9999 !important;
+        }
+        .select2-results__option--highlighted[aria-selected] {
+            background-color: #fef2f2 !important;
+            color: #c8102e !important;
+            border-radius: 12px !important;
+        }
+        .select2-results__option {
+            padding: 12px 16px !important;
+            font-size: 0.875rem !important;
+            font-weight: 700 !important;
+            color: #475569 !important;
+            margin-bottom: 4px !important;
+        }
+        .select2-search--dropdown .select2-search__field {
+            border: 2px solid #f1f5f9 !important;
+            border-radius: 12px !important;
+            padding: 10px 14px !important;
+            background: #f8fafc !important;
+        }
+    </style>
 </head>
 <body class="h-full">
     {% include "menu.html" %}
@@ -19,97 +85,71 @@
         </div>
 
         <!-- Card de Encaminhamento -->
-        <div class="bg-white rounded-[2.5rem] shadow-2xl shadow-slate-200/60 border border-slate-100 overflow-hidden transform transition-all">
-            <div class="px-10 py-8 border-b border-slate-50 bg-slate-50/30 flex items-center justify-between">
-                <div class="flex items-center gap-4">
-                    <div class="p-3 bg-red-50 text-sga-red rounded-2xl shadow-sm ring-1 ring-red-100">
-                        <i data-lucide="send" class="w-6 h-6"></i>
-                    </div>
-                    <div>
-                        <h2 class="text-2xl font-black text-slate-800 tracking-tight">Nova Tramitação</h2>
-                        <p class="text-[11px] font-black uppercase tracking-widest text-slate-400 mt-0.5">Definir fluxo de destino</p>
-                    </div>
-                </div>
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+            <div class="px-6 py-4 border-b border-slate-50 bg-slate-50/50 flex items-center gap-2">
+                <i data-lucide="send" class="w-4 h-4 text-sga-red"></i>
+                <h3 class="text-xs font-black uppercase tracking-widest text-slate-500">Tramitação de Documento</h3>
             </div>
 
-            <form class="p-10 space-y-8" method="post">
+            <form class="p-6 space-y-6" method="post">
                 {% csrf_token %}
                 
-                <div class="space-y-2">
-                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest block ml-1">Modalidade de Envio</label>
-                    <div class="relative group">
-                        {{ form.tipo_movimentacao }}
+                <div class="space-y-1.5 focus-within:text-sga-red transition-colors">
+                    <label class="text-xs font-bold text-slate-600 uppercase tracking-wider block mb-1">Modalidade de Envio</label>
+                    {{ form.tipo_movimentacao }}
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="space-y-1.5 sga-form-group focus-within:text-sga-red transition-colors">
+                        <label class="text-xs font-bold text-slate-600 uppercase tracking-wider block mb-1">
+                            {{ form.departamento_destino.label }}
+                        </label>
+                        {{ form.departamento_destino }}
+                        <p class="form-help text-[10px] text-slate-400 font-medium mt-1 italic">Direccionado ao Gabinete Geral</p>
+                        {% if form.departamento_destino.errors %}
+                            <div class="text-[10px] text-red-500 font-bold mt-1">{{ form.departamento_destino.errors }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="space-y-1.5 sga-form-group focus-within:text-sga-red transition-colors">
+                        <label class="text-xs font-bold text-slate-600 uppercase tracking-wider block mb-1">
+                            {{ form.seccao_destino.label }}
+                            <span class="text-emerald-500 font-black ml-1">★</span>
+                        </label>
+                        {{ form.seccao_destino }}
+                        <p class="form-help text-[10px] text-slate-400 font-medium mt-1 italic">Direccionado a secção especializada</p>
+                        {% if form.seccao_destino.errors %}
+                            <div class="text-[10px] text-red-500 font-bold mt-1">{{ form.seccao_destino.errors }}</div>
+                        {% endif %}
                     </div>
                 </div>
 
-                <div class="p-8 bg-slate-50/50 rounded-3xl border border-slate-100 space-y-6 shadow-inner">
-                    <div class="flex items-center gap-2 mb-2 px-2">
-                        <i data-lucide="map-pin" class="w-4 h-4 text-sga-red"></i>
-                        <span class="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Destinação Oficial</span>
-                    </div>
-
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8 p-1">
-                        <div class="space-y-2 group/field">
-                            <label class="text-[10px] font-bold text-slate-500 uppercase tracking-wider block ml-1 transition-colors group-focus-within/field:text-sga-red">
-                                {{ form.departamento_destino.label }}
-                            </label>
-                            {{ form.departamento_destino }}
-                            <p class="form-help text-[9px] text-slate-400 font-bold italic mt-2 px-1">Gabinete Central</p>
-                            {% if form.departamento_destino.errors %}
-                                <div class="text-[10px] text-red-500 font-bold mt-1 px-1">{{ form.departamento_destino.errors }}</div>
-                            {% endif %}
-                        </div>
-
-                        <div class="space-y-2 group/field">
-                            <label class="text-[10px] font-bold text-slate-500 uppercase tracking-wider block ml-1 transition-colors group-focus-within/field:text-emerald-600">
-                                {{ form.seccao_destino.label }}
-                            </label>
-                            {{ form.seccao_destino }}
-                            <p class="form-help text-[9px] text-slate-400 font-bold italic mt-2 px-1">Secção Especializada</p>
-                            {% if form.seccao_destino.errors %}
-                                <div class="text-[10px] text-red-500 font-bold mt-1 px-1">{{ form.seccao_destino.errors }}</div>
-                            {% endif %}
-                        </div>
-                    </div>
-                    
-                    <div class="px-2 pb-2">
-                        <div class="flex items-center gap-3 p-4 bg-white/50 rounded-2xl border border-slate-200/50">
-                            <i data-lucide="info" class="w-4 h-4 text-sga-red flex-shrink-0"></i>
-                            <p class="text-[10px] text-slate-500 leading-relaxed font-medium">
-                                Seleccione <span class="text-slate-800 font-bold">apenas um</span> destino. O sistema prioriza a unidade técnica quando ambos são preenchidos.
-                            </p>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="space-y-2">
-                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest block ml-1">Observações / Parecer Técnico</label>
+                <div class="space-y-1.5 focus-within:text-sga-red transition-colors">
+                    <label class="text-xs font-bold text-slate-600 uppercase tracking-wider block mb-1">Seu Parecer Técnico / Orientação</label>
                     <div class="relative">
                          {{ form.observacoes }}
-                         <div class="absolute right-4 bottom-4 pointer-events-none opacity-20">
-                             <i data-lucide="pen-tool" class="w-5 h-5"></i>
-                         </div>
                     </div>
                     {% if form.observacoes.errors %}
                         <div class="text-[10px] text-red-500 font-bold mt-1">{{ form.observacoes.errors }}</div>
                     {% endif %}
                 </div>
 
-                <div class="pt-6 border-t border-slate-50 flex flex-col md:flex-row gap-4">
-                    <button type="submit" class="flex-1 bg-sga-red hover:bg-red-700 text-white py-5 rounded-2xl font-black text-xs uppercase tracking-widest transition-all transform active:scale-[0.98] shadow-2xl shadow-red-200/50 flex items-center justify-center gap-3">
+                <div class="pt-4 border-t border-slate-100 flex items-center justify-end gap-3">
+                    <button type="button" onclick="window.history.back()" class="px-6 py-2.5 rounded-xl text-sm font-bold text-slate-500 hover:bg-slate-100 transition-all">
+                        Cancelar
+                    </button>
+                    <button type="submit" class="inline-flex items-center gap-2 px-8 py-2.5 bg-sga-red hover:bg-red-700 text-white rounded-xl font-bold text-sm shadow-xl shadow-red-100 transition-all hover:-translate-y-0.5 active:translate-y-0">
                         <i data-lucide="send" class="w-4 h-4"></i>
                         Confirmar Reencaminhamento
                     </button>
-                    <button type="button" onclick="window.history.back()" class="md:w-48 bg-slate-100 hover:bg-slate-200 text-slate-600 py-5 rounded-2xl font-black text-xs uppercase tracking-widest transition-all">
-                        Cancelar
-                    </button>
                 </div>
+            </form>
+        </div>
             </form>
         </div>
     </main>
 
     <!-- Scripts -->
-    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
     <script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
     
@@ -118,7 +158,7 @@
             // Inicializar Lucide
             if (window.lucide) { lucide.createIcons(); }
 
-            // Estilizar inputs via JS (Aurora Light Theme)
+            // Estilizar inputs via JS (Aurora Premium)
             document.querySelectorAll('input:not([type="hidden"]), select, textarea').forEach(el => {
                 if (!el.classList.contains('select2-hidden-accessible')) {
                     el.className = "block w-full h-[60px] px-6 py-4 bg-slate-50 border-2 border-slate-100/50 focus:bg-white focus:ring-4 focus:ring-sga-red/10 focus:border-red-500/30 rounded-2xl text-sm font-bold transition-all outline-none text-slate-700 placeholder:text-slate-300 shadow-inner appearance-none";
@@ -127,91 +167,14 @@
 
             // Inicializar Select2
             $(document).ready(function() {
+                const $deptSelect = $('select[name="departamento_destino"]');
+                const $seccaoSelect = $('select[name="seccao_destino"]');
+
                 $('select').select2({
                     placeholder: 'Pesquisar destino...',
                     width: '100%',
                     minimumResultsForSearch: 10
-                });
-
-                // CSS customizado para Select2 (Aurora Premium Light - PIXEL PERFECT)
-                $("<style>").prop("type", "text/css").html(`
-                    .select2-container--default .select2-selection--single {
-                        background-color: #f8fafc;
-                        border: 2px solid #f1f5f9;
-                        border-radius: 16px;
-                        height: 60px !important;
-                        display: flex;
-                        align-items: center;
-                        padding: 0 18px;
-                        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-                        box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.05);
-                    }
-                    .select2-container--default.select2-container--focus .select2-selection--single {
-                        border-color: rgba(200, 16, 46, 0.4);
-                        background-color: #ffffff;
-                        box-shadow: 0 0 0 6px rgba(200, 16, 46, 0.04), inset 0 2px 4px 0 rgba(0, 0, 0, 0.02);
-                    }
-                    .select2-container--default .select2-selection--single .select2-selection__rendered {
-                        color: #1e293b;
-                        font-weight: 800;
-                        font-size: 0.9rem;
-                        line-height: 60px; /* Vertically center text */
-                        padding-left: 0;
-                        padding-right: 20px;
-                        width: 100%;
-                    }
-                    .select2-container--default .select2-selection--single .select2-selection__placeholder {
-                        color: #94a3b8;
-                        font-weight: 600;
-                    }
-                    .select2-container--default .select2-selection--single .select2-selection__arrow {
-                        height: 60px;
-                        right: 16px;
-                    }
-                    .select2-container--default .select2-selection--single .select2-selection__arrow b {
-                        border-color: #94a3b8 transparent transparent transparent;
-                        border-width: 6px 5px 0 5px;
-                        margin-top: -3px;
-                    }
-                    
-                    /* Dropdown Results */
-                    .select2-dropdown {
-                        border: 1px solid #f1f5f9;
-                        border-radius: 20px;
-                        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15);
-                        margin-top: 8px;
-                        overflow: hidden;
-                        padding: 8px;
-                        z-index: 9999;
-                    }
-                    .select2-search--dropdown {
-                        padding: 8px;
-                    }
-                    .select2-search--dropdown .select2-search__field {
-                        border: 2px solid #f1f5f9;
-                        border-radius: 12px;
-                        padding: 10px 14px;
-                        font-family: inherit;
-                        outline: none;
-                        background: #f8fafc;
-                        font-weight: 600;
-                    }
-                    .select2-results__option--highlighted[aria-selected] {
-                        background-color: #fef2f2 !important;
-                        color: #c8102e !important;
-                        border-radius: 12px;
-                    }
-                    .select2-results__option {
-                        padding: 12px 16px;
-                        font-size: 0.875rem;
-                        font-weight: 700;
-                        color: #475569;
-                        margin-bottom: 4px;
-                    }
-                `).appendTo("head");
-
-                const $deptSelect = $('select[name="departamento_destino"]');
-                const $seccaoSelect = $('select[name="seccao_destino"]');
+                }).on('change', handleExclusivity);
 
                 function handleExclusivity() {
                     const deptVal = $deptSelect.val();
@@ -220,21 +183,18 @@
                     if (deptVal) {
                         $seccaoSelect.prop('disabled', true);
                         $seccaoSelect.next('.select2-container').css('opacity', '0.2').css('pointer-events', 'none');
-                        $seccaoSelect.closest('.space-y-2').find('.form-help').text('⚠️ BLOQUEADO');
+                        $seccaoSelect.closest('.space-y-1.5').find('.form-help').text('⚠️ BLOQUEADO');
                     } else if (seccaoVal) {
                         $deptSelect.prop('disabled', true);
                         $deptSelect.next('.select2-container').css('opacity', '0.2').css('pointer-events', 'none');
-                        $deptSelect.closest('.space-y-2').find('.form-help').text('⚠️ BLOQUEADO');
+                        $deptSelect.closest('.space-y-1.5').find('.form-help').text('⚠️ BLOQUEADO');
                     } else {
                         $deptSelect.prop('disabled', false).next('.select2-container').css('opacity', '1').css('pointer-events', 'auto');
                         $seccaoSelect.prop('disabled', false).next('.select2-container').css('opacity', '1').css('pointer-events', 'auto');
-                        $deptSelect.closest('.space-y-2').find('.form-help').text('Gabinete Central');
-                        $seccaoSelect.closest('.space-y-2').find('.form-help').text('Secção Especializada');
+                        $deptSelect.closest('.space-y-1.5').find('.form-help').text('Gabinete Central');
+                        $seccaoSelect.closest('.space-y-1.5').find('.form-help').text('Secção Especializada');
                     }
                 }
-
-                $deptSelect.on('change', handleExclusivity);
-                $seccaoSelect.on('change', handleExclusivity);
                 
                 // Allow submitting disabled fields
                 $('form').on('submit', function() {
@@ -242,7 +202,7 @@
                     $seccaoSelect.prop('disabled', false);
                 });
 
-                setTimeout(handleExclusivity, 100);
+                handleExclusivity();
             });
         });
     </script>

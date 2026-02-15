@@ -1,0 +1,219 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Expedientes - SGA Aurora{% endblock %}
+
+{% block content %}
+    <!-- Header da Página -->
+    <div class="mb-10 flex flex-col md:flex-row md:items-center justify-between gap-8">
+        <div class="flex items-center gap-4">
+            <div class="p-4 bg-white rounded-2xl shadow-sm border border-slate-100 ring-1 ring-slate-200/50">
+                <i data-lucide="folder-kanban" class="w-8 h-8 text-sga-red"></i>
+            </div>
+            <div>
+                <h2 class="text-3xl font-black text-slate-800 tracking-tight font-display">Expedientes</h2>
+                <p class="text-slate-400 font-medium text-sm mt-0.5 uppercase tracking-widest">Painel central de documentos e tramitações</p>
+            </div>
+        </div>
+        
+        <a href="{% url 'criar_documento' %}" class="inline-flex items-center gap-3 px-8 py-3.5 bg-slate-900 hover:bg-black text-white rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-xl shadow-slate-200 hover:-translate-y-0.5 active:scale-95">
+            <i data-lucide="plus" class="w-4 h-4"></i>
+            Novo Registro
+        </a>
+    </div>
+
+    <!-- Barra de Ferramentas Premium -->
+    <div class="bg-white rounded-[2rem] shadow-sm border border-slate-100 mb-8 overflow-hidden">
+        <div class="p-4 flex flex-col lg:flex-row gap-6 items-center">
+            
+            <!-- Pesquisa Inteligente -->
+            <div class="relative flex-1 w-full group">
+                <div class="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
+                    <i data-lucide="search" class="w-5 h-5 text-slate-300 group-focus-within:text-sga-red transition-colors"></i>
+                </div>
+                <input 
+                    type="search" 
+                    id="table-search-input" 
+                    placeholder="Pesquisar por protocolo, assunto ou origem..." 
+                    class="block w-full pl-14 pr-6 py-4 bg-slate-50 border-2 border-transparent focus:bg-white focus:border-sga-red/20 focus:ring-4 focus:ring-sga-red/5 rounded-2xl text-sm font-bold transition-all outline-none"
+                >
+            </div>
+
+            <!-- Divisor Vertical -->
+            <div class="hidden lg:block w-px h-10 bg-slate-100"></div>
+
+            <!-- Filtros de Localidade (Switcher Estilizado) -->
+            <div class="flex items-center p-1.5 bg-slate-100/80 rounded-2xl w-full lg:w-auto">
+                <a href="?{% if request.GET.status %}status={{ request.GET.status }}&{% endif %}{% if request.GET.prioridade %}prioridade={{ request.GET.prioridade }}&{% endif %}" 
+                   class="flex-1 lg:flex-none px-6 py-2.5 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all whitespace-nowrap {% if not request.GET.local %}bg-white text-slate-900 shadow-sm{% else %}text-slate-500 hover:text-slate-800{% endif %}">
+                    Todos
+                </a>
+                <a href="?local=posse{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}{% if request.GET.prioridade %}&prioridade={{ request.GET.prioridade }}{% endif %}" 
+                   class="flex-1 lg:flex-none px-6 py-2.5 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all whitespace-nowrap {% if request.GET.local == 'posse' %}bg-white text-emerald-600 shadow-sm{% else %}text-slate-500 hover:text-slate-800{% endif %}">
+                    Em Posse
+                </a>
+                <a href="?local=historico{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}{% if request.GET.prioridade %}&prioridade={{ request.GET.prioridade }}{% endif %}" 
+                   class="flex-1 lg:flex-none px-6 py-2.5 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all whitespace-nowrap {% if request.GET.local == 'historico' %}bg-white text-amber-600 shadow-sm{% else %}text-slate-500 hover:text-slate-800{% endif %}">
+                    Histórico
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabela Aurora Premium -->
+    <div class="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+                <thead>
+                    <tr class="bg-slate-50/50 border-b border-slate-100">
+                        <th class="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-slate-400">Protocolo</th>
+                        <th class="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-slate-400">Tipo</th>
+                        <th class="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-slate-400">Assunto / Emissor</th>
+                        <th class="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-slate-400 text-center">Prioridade</th>
+                        <th class="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-slate-400 text-center">Data</th>
+                        <th class="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-slate-400 text-right">Acções</th>
+                    </tr>
+                </thead>
+                <tbody id="documents-table-body" class="divide-y divide-slate-50">
+                    {% for documento in documentos %}
+                    <tr class="group hover:bg-slate-50/80 transition-all duration-200">
+                        <!-- Protocolo -->
+                        <td class="px-8 py-6">
+                            <span class="inline-flex items-center px-3 py-1 rounded-lg bg-slate-100 border border-slate-200 text-slate-600 text-[10px] font-black font-mono shadow-sm">
+                                {{ documento.numero_protocolo }}
+                            </span>
+                        </td>
+                        
+                        <!-- Tipo -->
+                        <td class="px-8 py-6">
+                            <span class="text-[11px] font-bold text-slate-500 uppercase tracking-tighter">
+                                {{ documento.tipo_documento }}
+                            </span>
+                        </td>
+
+                        <!-- Assunto / Emissor -->
+                        <td class="px-8 py-6 max-w-md">
+                            <div class="flex flex-col">
+                                <span class="text-[13px] font-bold text-slate-800 leading-snug group-hover:text-sga-red transition-colors">
+                                    {{ documento.titulo|truncatechars:100 }}
+                                </span>
+                                <span class="text-[10px] text-slate-400 font-black uppercase tracking-wider mt-1.5 flex items-center gap-1.5">
+                                    <div class="w-1 h-1 rounded-full bg-slate-300"></div>
+                                    {{ documento.origem }}
+                                </span>
+                            </div>
+                        </td>
+
+                        <!-- Prioridade -->
+                        <td class="px-8 py-6 text-center">
+                            {% if documento.prioridade == 'urgente' %}
+                                <span class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-red-50 text-red-600 text-[9px] font-black uppercase border border-red-100 shadow-sm">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-red-600 animate-pulse"></span>
+                                    Crítico
+                                </span>
+                            {% elif documento.prioridade == 'alta' %}
+                                <span class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-50 text-amber-600 text-[9px] font-black uppercase border border-amber-100">
+                                    Alta
+                                </span>
+                            {% else %}
+                                <span class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-100 text-slate-400 text-[9px] font-black uppercase border border-slate-200">
+                                    {{ documento.prioridade }}
+                                </span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Data -->
+                        <td class="px-8 py-6 text-center">
+                            <span class="text-[11px] font-bold text-slate-500">
+                                {{ documento.data_criacao|date:"d/m/Y" }}
+                            </span>
+                        </td>
+
+                        <!-- Ações -->
+                        <td class="px-8 py-6 text-right">
+                            <div class="flex items-center justify-end gap-3">
+                                <a href="{% url 'detalhe_documento' documento.id %}" 
+                                   title="Ver Detalhes"
+                                   class="inline-flex items-center justify-center w-10 h-10 bg-slate-100 hover:bg-sga-red hover:text-white text-slate-400 rounded-xl transition-all shadow-sm group/btn"
+                                >
+                                    <i data-lucide="eye" class="w-4 h-4 transition-transform group-hover/btn:scale-110"></i>
+                                </a>
+
+                                {% if not documento.movimentacoes.exists %}
+                                <a href="{% url 'editar_documento' documento.id %}" 
+                                   title="Editar"
+                                   class="inline-flex items-center justify-center w-10 h-10 bg-slate-100 hover:bg-amber-500 hover:text-white text-slate-400 rounded-xl transition-all shadow-sm group/btn"
+                                >
+                                    <i data-lucide="edit-3" class="w-4 h-4 transition-transform group-hover/btn:scale-110"></i>
+                                </a>
+                                {% endif %}
+
+                                {% if user.nivel_acesso in 'admin,diretor,gerente,admin_sistema' %}
+                                <a href="{% url 'Encaminhar' documento.id %}" 
+                                   title="Encaminhar"
+                                   class="inline-flex items-center justify-center w-10 h-10 bg-slate-100 hover:bg-slate-900 hover:text-white text-slate-400 rounded-xl transition-all shadow-sm group/btn"
+                                >
+                                    <i data-lucide="send" class="w-4 h-4 transition-transform group-hover/btn:scale-110"></i>
+                                </a>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="px-8 py-32 text-center">
+                            <div class="flex flex-col items-center">
+                                <div class="w-24 h-24 bg-slate-50 rounded-full flex items-center justify-center mb-6 shadow-inner ring-8 ring-slate-100/50">
+                                    <i data-lucide="folder-open" class="w-12 h-12 text-slate-200"></i>
+                                </div>
+                                <h4 class="text-xl font-black text-slate-800 mb-2 uppercase tracking-tight">Vazio por aqui</h4>
+                                <p class="text-sm text-slate-400 max-w-sm mx-auto font-medium">Nenhum documento encontrado para os filtros aplicados. Tente ajustar sua busca.</p>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Paginação -->
+        {% if documentos.has_other_pages %}
+        <div class="px-8 py-6 bg-slate-50/50 border-t border-slate-100 flex items-center justify-between">
+             <div class="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                Página {{ documentos.number }} de {{ documentos.paginator.num_pages }}
+            </div>
+            <div class="flex gap-2">
+                {% if documentos.has_previous %}
+                    <a href="?page={{ documentos.previous_page_number }}{% if request.GET.local %}&local={{ request.GET.local }}{% endif %}" class="px-5 py-2.5 bg-white border border-slate-200 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 transition-all">Anterior</a>
+                {% endif %}
+                {% if documentos.has_next %}
+                    <a href="?page={{ documentos.next_page_number }}{% if request.GET.local %}&local={{ request.GET.local }}{% endif %}" class="px-8 py-2.5 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-black transition-all shadow-xl shadow-slate-200">Próxima</a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+{% endblock %}
+
+{% block extra_js %}
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Pesquisa Client-side aprimorada
+            const searchInput = document.getElementById('table-search-input');
+            const tableRows = document.querySelectorAll('#documents-table-body tr');
+
+            if (searchInput) {
+                searchInput.addEventListener('input', function(e) {
+                    const searchTerm = e.target.value.toLowerCase().trim();
+                    
+                    tableRows.forEach(row => {
+                        if (row.querySelector('td[colspan]')) return; // Pular se for a linha "vazia"
+                        
+                        const text = row.textContent.toLowerCase();
+                        row.style.display = text.includes(searchTerm) ? "" : "none";
+                    });
+                });
+            }
+        });
+    </script>
+{% endblock %}
