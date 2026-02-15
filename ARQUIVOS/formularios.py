@@ -30,6 +30,7 @@ from .hierarchy_manager import (
     HierarchyManager,
     validar_destino_encaminhamento,
     obter_label_dinamico,
+    obter_secretaria_geral,
 )
 
 
@@ -134,13 +135,22 @@ class EncaminharDocumentoForm(forms.ModelForm):
             'tipo_movimentacao': forms.Select(attrs={'class': 'form-control'}),
             'departamento_destino': forms.Select(attrs={
                 'class': 'form-control',
-                'data-exclusivo': 'seccao_destino'
+                'data-exclusive': 'seccao_destino,destino_hierarquico'
             }),
             'seccao_destino': forms.Select(attrs={
                 'class': 'form-control',
-                'data-exclusivo': 'departamento_destino'
+                'data-exclusive': 'departamento_destino,destino_hierarquico'
             }),
         }
+
+    destino_hierarquico = forms.ModelChoiceField(
+        queryset=Administracao.objects.none(),
+        required=False,
+        widget=forms.Select(attrs={
+            'class': 'form-control',
+            'data-exclusive': 'departamento_destino,seccao_destino'
+        })
+    )
 
     def __init__(self, *args, **kwargs):
         self.user      = kwargs.pop('user', None)
@@ -162,53 +172,87 @@ class EncaminharDocumentoForm(forms.ModelForm):
         if self.user:
             manager = HierarchyManager(self.user)
             
-            # Obter destinos (excluindo self)
-            qs_dept, qs_sec, seccoes_fixas = manager.obter_destinos_permitidos(incluir_self=False)
+            # Obter destinos
+            self.show_external = manager.usuario_pode_encaminhar_externo()
+            qs_hierarquico = manager.obter_destinos_hierarquicos()
+            qs_dept_permitidos, qs_sec, seccoes_fixas = manager.obter_destinos_permitidos(incluir_self=False)
             
-            self.fields['departamento_destino'].queryset = qs_dept
+            # Filtrar departamentos para serem apenas INTERNOS (mesma administração)
+            qs_dept_interno = qs_dept_permitidos.filter(administracao=self.user.administracao)
+            
+            self.fields['destino_hierarquico'].queryset = qs_hierarquico
+            self.fields['departamento_destino'].queryset = qs_dept_interno
             self.fields['seccao_destino'].queryset = qs_sec
+            
+            # Customizar labels para omitir administração se for a do usuário (limpeza visual)
+            user_admin = self.user.administracao
+            
+            def dept_label(obj):
+                if user_admin and obj.administracao == user_admin:
+                    return obj.nome
+                return f"{obj.nome} ({obj.administracao.nome if obj.administracao else '?'})"
+                
+            def sec_label(obj):
+                if user_admin and obj.administracao == user_admin:
+                    return obj.nome
+                return f"{obj.nome} [{obj.administracao.nome if obj.administracao else '?'}]"
+
+            self.fields['departamento_destino'].label_from_instance = dept_label
+            self.fields['seccao_destino'].label_from_instance = sec_label
             
             # Armazenar para uso no template
             self.seccoes_fixas = seccoes_fixas
             
-            # Preparar dados JSON para JavaScript (apenas se secções forem dinâmicas)
+            # Preparar dados JSON para JavaScript
             if not seccoes_fixas:
                 self.seccoes_data = {}
-                if qs_dept.exists():
-                    dept_id = qs_dept.first().pk
-                    self.seccoes_data[dept_id] = list(
-                        qs_sec.values('id', 'nome')
-                    )
+                if qs_dept_interno.exists():
+                    for d in qs_dept_interno:
+                        self.seccoes_data[d.pk] = list(
+                            Seccoes.objects.filter(departamento=d).values('id', 'nome')
+                        )
             else:
                 self.seccoes_data = None
 
             # Labels dinâmicos
             labels = obter_label_dinamico(self.user, contexto='encaminhamento')
+            self.fields['destino_hierarquico'].label = labels['hierarquico']
             self.fields['departamento_destino'].label = labels['departamento']
             self.fields['seccao_destino'].label = labels['seccao']
         else:
+            self.fields['destino_hierarquico'].queryset = Administracao.objects.none()
             self.fields['departamento_destino'].queryset = Departamento.objects.none()
             self.fields['seccao_destino'].queryset = Seccoes.objects.none()
             self.seccoes_fixas = False
             self.seccoes_data = None
 
         self.fields['seccao_destino'].label_from_instance = lambda obj: obj.nome
+        self.fields['destino_hierarquico'].label_from_instance = lambda obj: obj.nome
 
     def clean(self):
         cleaned_data = super().clean()
+        dest_hierarquico = cleaned_data.get('destino_hierarquico')
         dept_destino = cleaned_data.get('departamento_destino')
         sec_destino = cleaned_data.get('seccao_destino')
         tipo_mov = cleaned_data.get('tipo_movimentacao')
 
         if tipo_mov == 'encaminhamento':
-            is_valid, error_msg = validar_destino_encaminhamento(
-                self.user,
-                dept_id=dept_destino.pk if dept_destino else None,
-                seccao_id=sec_destino.pk if sec_destino else None,
-            )
-            if not is_valid:
-                raise ValidationError(error_msg)
+            # Contar quantos destinos foram selecionados
+            selecionados = [d for d in [dest_hierarquico, dept_destino, sec_destino] if d]
+            
+            if len(selecionados) == 0:
+                raise ValidationError('Selecione um destino (Governo, Direção ou Secção).')
+            
+            if len(selecionados) > 1:
+                raise ValidationError('Escolha APENAS UM destino.')
 
+            # Se for destino hierárquico, validar e converter internamente
+            if dest_hierarquico:
+                sec_geral = obter_secretaria_geral(dest_hierarquico)
+                if not sec_geral:
+                    raise ValidationError(f'A administração {dest_hierarquico.nome} não possui uma Secretaria Geral configurada para receber documentos.')
+                cleaned_data['departamento_destino'] = sec_geral
+            
         return cleaned_data
 
 

@@ -125,8 +125,14 @@
                                             <span class="text-[10px] font-bold text-slate-400 uppercase tracking-tight">
                                                 {% if obs.usuario.departamento %}
                                                     {{ obs.usuario.departamento.nome }}
+                                                    {% if obs.usuario.administracao != user.administracao %}
+                                                        - {{ obs.usuario.administracao.nome }}
+                                                    {% endif %}
                                                 {% elif obs.usuario.seccao %}
                                                     {{ obs.usuario.seccao.nome }}
+                                                    {% if obs.usuario.seccao.departamento.administracao != user.administracao %}
+                                                        - {{ obs.usuario.seccao.departamento.administracao.nome }}
+                                                    {% endif %}
                                                 {% else %}
                                                     Acesso Externo / Sistema
                                                 {% endif %}
@@ -161,13 +167,21 @@
                             <input type="hidden" name="action" value="encaminhar">
                             {{ encaminhar_form.tipo_movimentacao.as_hidden }}
 
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {% if encaminhar_form.show_external %}
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                <div class="space-y-1.5 sga-form-group">
+                                    <label class="text-xs font-bold text-slate-600 uppercase tracking-wider block mb-1">
+                                        {{ encaminhar_form.destino_hierarquico.label }}
+                                    </label>
+                                    {{ encaminhar_form.destino_hierarquico }}
+                                    <p class="text-[10px] text-slate-400 font-medium mt-1 italic">Entidade Externa</p>
+                                </div>
                                 <div class="space-y-1.5 sga-form-group">
                                     <label class="text-xs font-bold text-slate-600 uppercase tracking-wider block mb-1">
                                         {{ encaminhar_form.departamento_destino.label }}
                                     </label>
                                     {{ encaminhar_form.departamento_destino }}
-                                    <p class="text-[10px] text-slate-400 font-medium mt-1 italic">Direccionado ao Gabinete Geral</p>
+                                    <p class="text-[10px] text-slate-400 font-medium mt-1 italic">Interno ao Órgão</p>
                                 </div>
                                 <div class="space-y-1.5 sga-form-group">
                                     <label class="text-xs font-bold text-slate-600 uppercase tracking-wider block mb-1">
@@ -175,9 +189,28 @@
                                         <span class="text-emerald-500 font-black ml-1">★</span>
                                     </label>
                                     {{ encaminhar_form.seccao_destino }}
-                                    <p class="text-[10px] text-slate-400 font-medium mt-1 italic">Direccionado a secção especializada</p>
+                                    <p class="text-[10px] text-slate-400 font-medium mt-1 italic">Unidade Técnica</p>
                                 </div>
                             </div>
+                            {% else %}
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div class="space-y-1.5 sga-form-group">
+                                    <label class="text-xs font-bold text-slate-600 uppercase tracking-wider block mb-1">
+                                        {{ encaminhar_form.departamento_destino.label }}
+                                    </label>
+                                    {{ encaminhar_form.departamento_destino }}
+                                    <p class="text-[10px] text-slate-400 font-medium mt-1 italic">Interno ao Órgão</p>
+                                </div>
+                                <div class="space-y-1.5 sga-form-group">
+                                    <label class="text-xs font-bold text-slate-600 uppercase tracking-wider block mb-1">
+                                        {{ encaminhar_form.seccao_destino.label }}
+                                        <span class="text-emerald-500 font-black ml-1">★</span>
+                                    </label>
+                                    {{ encaminhar_form.seccao_destino }}
+                                    <p class="text-[10px] text-slate-400 font-medium mt-1 italic">Unidade Técnica</p>
+                                </div>
+                            </div>
+                            {% endif %}
 
                             <div class="space-y-1.5">
                                 <label class="text-xs font-bold text-slate-600 uppercase tracking-wider block mb-1">Seu Parecer Técnico / Orientação</label>
@@ -298,9 +331,19 @@
                                 <p class="text-[13px] text-slate-800 leading-tight">
                                     <span class="font-bold text-sga-red">{{ mov.get_tipo_movimentacao_display }}</span>
                                     {% if mov.seccao_destino %}
-                                        para <span class="font-bold text-slate-600">{{ mov.seccao_destino.nome }}</span>
+                                        para <span class="font-bold text-slate-600">
+                                            {{ mov.seccao_destino.nome }}
+                                            {% if mov.seccao_destino.departamento.administracao != user.administracao %}
+                                                - {{ mov.seccao_destino.departamento.administracao.nome }}
+                                            {% endif %}
+                                        </span>
                                     {% elif mov.departamento_destino %}
-                                        para <span class="font-bold text-slate-600">{{ mov.departamento_destino.nome }}</span>
+                                        para <span class="font-bold text-slate-600">
+                                            {{ mov.departamento_destino.nome }}
+                                            {% if mov.departamento_destino.administracao != user.administracao %}
+                                                - {{ mov.departamento_destino.administracao.nome }}
+                                            {% endif %}
+                                        </span>
                                     {% endif %}
                                 </p>
                                 <div class="mt-2 flex items-center gap-2">
@@ -347,23 +390,35 @@
             });
 
             // Lógica de Independência de Selects (Select2 integrada)
+            const $hierSelect = $('select[name="destino_hierarquico"]');
             const $deptSelect = $('select[name="departamento_destino"]');
             const $seccaoSelect = $('select[name="seccao_destino"]');
 
             function handleExclusivity() {
+                const hierVal = $hierSelect.val();
                 const deptVal = $deptSelect.val();
                 const seccaoVal = $seccaoSelect.val();
 
-                if (deptVal) {
-                    $seccaoSelect.prop('disabled', true);
-                    $seccaoSelect.next('.select2-container').css('opacity', '0.4');
+                if (hierVal) {
+                    lock($deptSelect); lock($seccaoSelect);
+                } else if (deptVal) {
+                    lock($hierSelect); lock($seccaoSelect);
                 } else if (seccaoVal) {
-                    $deptSelect.prop('disabled', true);
-                    $deptSelect.next('.select2-container').css('opacity', '0.4');
+                    lock($hierSelect); lock($deptSelect);
                 } else {
-                    $deptSelect.prop('disabled', false).next('.select2-container').css('opacity', '1');
-                    $seccaoSelect.prop('disabled', false).next('.select2-container').css('opacity', '1');
+                    unlock($hierSelect); unlock($deptSelect); unlock($seccaoSelect);
                 }
+            }
+
+            function lock($el) {
+                $el.prop('disabled', true);
+                $el.next('.select2-container').css('opacity', '0.2').css('pointer-events', 'none');
+                $el.closest('.space-y-1.5').find('.form-help:not(.italic)').text('⚠️ BLOQUEADO');
+            }
+
+            function unlock($el) {
+                $el.prop('disabled', false).next('.select2-container').css('opacity', '1').css('pointer-events', 'auto');
+                $el.closest('.space-y-1.5').find('.p.text-slate-400').text(''); // Reset logic if needed
             }
 
             // Inicializar Select2
@@ -383,39 +438,40 @@
                         height: 60px !important;
                         display: flex;
                         align-items: center;
-                        padding: 0 18px;
+                        padding: 0 16px !important;
                         transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
                         box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.05);
+                        width: 100% !important;
                     }
-                    .select2-container--default.select2-container--focus .select2-selection--single {
-                        border-color: rgba(200, 16, 46, 0.4);
-                        background-color: #ffffff;
-                        box-shadow: 0 0 0 6px rgba(200, 16, 46, 0.04), inset 0 2px 4px 0 rgba(0, 0, 0, 0.02);
+                    .select2-container {
+                        width: 100% !important;
+                    }
+                    .select2-container--default.select2-container--focus .select2-selection--single,
+                    .select2-container--default.select2-container--open .select2-selection--single {
+                        border-color: #ef444450 !important;
+                        background-color: #ffffff !important;
+                        box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.05) !important;
                     }
                     .select2-container--default .select2-selection--single .select2-selection__rendered {
-                        color: #1e293b;
-                        font-weight: 800;
-                        font-size: 0.9rem;
-                        line-height: 60px; /* Vertically center */
-                        padding-left: 0;
-                        padding-right: 20px;
-                        width: 100%;
+                        color: #1e293b !important;
+                        font-weight: 700 !important;
+                        font-size: 13px !important;
+                        line-height: 56px !important;
+                        padding-left: 0 !important;
+                        padding-right: 25px !important;
+                        white-space: nowrap;
+                        overflow: hidden;
+                        text-overflow: ellipsis;
+                        width: 100% !important;
                     }
                     .select2-container--default .select2-selection--single .select2-selection__arrow {
-                        height: 60px;
-                        right: 16px;
+                        height: 58px;
+                        right: 12px;
                     }
-                    .select2-container--default .select2-selection--single .select2-selection__arrow b {
-                        border-color: #94a3b8 transparent transparent transparent;
-                        border-width: 6px 5px 0 5px;
-                        margin-top: -3px;
-                    }
-                    
-                    /* Dropdown Results */
                     .select2-dropdown {
-                        border: 1px solid #f1f5f9;
-                        border-radius: 20px;
-                        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15);
+                        border: 2px solid #f1f5f9 !important;
+                        border-radius: 20px !important;
+                        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15) !important;
                         margin-top: 8px;
                         overflow: hidden;
                         padding: 8px;
@@ -441,6 +497,7 @@
             // Re-abilitar selects no submit
             document.querySelectorAll('form').forEach(form => {
                 form.addEventListener('submit', () => {
+                    $hierSelect.prop('disabled', false);
                     $deptSelect.prop('disabled', false);
                     $seccaoSelect.prop('disabled', false);
                 });

@@ -142,6 +142,48 @@ class HierarchyManager:
             ).values('id', 'nome')
         )
 
+    def obter_destinos_hierarquicos(self):
+        """
+        Retorna as Administrações (Governos/Municípios) para encaminhamento externo.
+        RESTRITO: Apenas para usuários da Secretaria Geral.
+        """
+        if not self.usuario_pode_encaminhar_externo():
+            return Administracao.objects.none()
+
+        admin = self.ctx['admin']
+        
+        # MAT
+        if admin.tipo_municipio == 'M':
+            return Administracao.objects.filter(tipo_municipio='G')
+            
+        # Governo Provincial
+        if admin.tipo_municipio == 'G':
+            return Administracao.objects.filter(
+                Q(provincia=admin.provincia) | Q(tipo_municipio='M')
+            ).exclude(pk=admin.pk)
+            
+        # Administração Municipal (Apenas se for Secretaria Geral, vê seu Governo)
+        if admin.tipo_municipio not in ('G', 'M'):
+            return Administracao.objects.filter(
+                provincia=admin.provincia,
+                tipo_municipio='G'
+            )
+            
+        return Administracao.objects.none()
+
+    def usuario_pode_encaminhar_externo(self):
+        """Helper para verificar se o usuário pode enviar para fora da sua administração."""
+        # Permitir se for da Secretaria Geral
+        if _is_secretaria_geral(self.ctx['dept']):
+            return True
+            
+        # OU se for um administrador (Sistema, Municipal ou Geral)
+        niveis_admin = ['admin_sistema', 'admin_municipal', 'admin']
+        if self.user.is_superuser or self.user.nivel_acesso in niveis_admin:
+            return True
+            
+        return False
+
 
 # ---------------------------------------------------------------------------
 # Lógica Central
@@ -323,19 +365,13 @@ def validar_destino_encaminhamento(user, dept_id=None, seccao_id=None):
 def obter_label_dinamico(user, contexto='encaminhamento'):
     """
     Retorna labels dinâmicos baseados no tipo de administração do usuário.
-    
-    Args:
-        user: CustomUser
-        contexto: 'encaminhamento' | 'criacao_usuario' | etc
-    
-    Returns:
-        dict com labels para departamento e secção
     """
     ctx = _get_contexto_usuario(user)
     admin = ctx['admin']
     
     labels = {
-        'departamento': 'Departamento',
+        'hierarquico': 'Governo / Administração',
+        'departamento': 'Direção / Departamento',
         'seccao': 'Secção',
     }
     
@@ -344,13 +380,24 @@ def obter_label_dinamico(user, contexto='encaminhamento'):
     
     if contexto == 'encaminhamento':
         if admin.tipo_municipio == 'M':
-            labels['departamento'] = 'Destino (Interno ou Governo Provincial)'
+            labels['hierarquico'] = 'Governo Provincial de Destino'
+            labels['departamento'] = 'Direção Interna (MAT)'
         elif admin.tipo_municipio == 'G':
-            labels['departamento'] = 'Destino (Interno, Municipal ou MAT)'
+            labels['hierarquico'] = 'Administração Municipal ou MAT'
+            labels['departamento'] = 'Direção Interna (Governo)'
         
         if ctx['em_seccao']:
-            labels['seccao'] = 'OU Encaminhar para Secção (do seu departamento)'
+            labels['seccao'] = 'OU para Secção (Interna)'
         else:
-            labels['seccao'] = 'OU Encaminhar para Secção'
+            labels['seccao'] = 'OU Secção Interna'
     
     return labels
+
+def obter_secretaria_geral(administracao):
+    """Retorna o departamento Secretaria Geral de uma administração."""
+    if not administracao:
+        return None
+    return Departamento.objects.filter(
+        administracao=administracao,
+        nome__icontains='Secretaria Geral'
+    ).first()

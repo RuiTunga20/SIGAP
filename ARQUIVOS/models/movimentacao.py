@@ -171,6 +171,36 @@ class MovimentacaoDocumento(models.Model):
             return self.departamento_origem.nome
         return "Origem não especificada"
 
+    def get_origem_contextual(self, viewer_admin=None):
+        """Retorna nome da origem com sufixo se for de outra administração."""
+        if self.seccao_origem:
+            nome = self.seccao_origem.nome
+            admin = self.seccao_origem.administracao
+        elif self.departamento_origem:
+            nome = self.departamento_origem.nome
+            admin = self.departamento_origem.administracao
+        else:
+            return "Sistema"
+
+        if viewer_admin and admin and admin != viewer_admin:
+            return f"{nome} - {admin.nome}"
+        return nome
+
+    def get_destino_contextual(self, viewer_admin=None):
+        """Retorna nome do destino com sufixo se for de outra administração."""
+        if self.seccao_destino:
+            nome = self.seccao_destino.nome
+            admin = self.seccao_destino.administracao
+        elif self.departamento_destino:
+            nome = self.departamento_destino.nome
+            admin = self.departamento_destino.administracao
+        else:
+            return "Sem destino"
+
+        if viewer_admin and admin and admin != viewer_admin:
+            return f"{nome} - {admin.nome}"
+        return nome
+
     def __str__(self):
         return f"{self.documento.numero_protocolo} - {self.get_tipo_movimentacao_display()}"
 

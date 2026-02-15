@@ -99,30 +99,70 @@
                     {{ form.tipo_movimentacao }}
                 </div>
 
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {% if form.show_external %}
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <!-- Destino Externo (Hierárquico) -->
+                    <div class="space-y-1.5 sga-form-group focus-within:text-sga-red transition-colors">
+                        <label class="text-xs font-bold text-slate-600 uppercase tracking-wider block mb-1">
+                            {{ form.destino_hierarquico.label }}
+                        </label>
+                        {{ form.destino_hierarquico }}
+                        <p class="form-help text-[10px] text-slate-400 font-medium mt-1 italic">Entidade Externa</p>
+                    </div>
+
+                    <!-- Destino Interno (Direção) -->
                     <div class="space-y-1.5 sga-form-group focus-within:text-sga-red transition-colors">
                         <label class="text-xs font-bold text-slate-600 uppercase tracking-wider block mb-1">
                             {{ form.departamento_destino.label }}
                         </label>
                         {{ form.departamento_destino }}
-                        <p class="form-help text-[10px] text-slate-400 font-medium mt-1 italic">Direccionado ao Gabinete Geral</p>
+                        <p class="form-help text-[10px] text-slate-400 font-medium mt-1 italic">Interno ao Órgão</p>
                         {% if form.departamento_destino.errors %}
                             <div class="text-[10px] text-red-500 font-bold mt-1">{{ form.departamento_destino.errors }}</div>
                         {% endif %}
                     </div>
 
+                    <!-- Destino Secção -->
                     <div class="space-y-1.5 sga-form-group focus-within:text-sga-red transition-colors">
                         <label class="text-xs font-bold text-slate-600 uppercase tracking-wider block mb-1">
                             {{ form.seccao_destino.label }}
                             <span class="text-emerald-500 font-black ml-1">★</span>
                         </label>
                         {{ form.seccao_destino }}
-                        <p class="form-help text-[10px] text-slate-400 font-medium mt-1 italic">Direccionado a secção especializada</p>
+                        <p class="form-help text-[10px] text-slate-400 font-medium mt-1 italic">Unidade Técnica</p>
                         {% if form.seccao_destino.errors %}
                             <div class="text-[10px] text-red-500 font-bold mt-1">{{ form.seccao_destino.errors }}</div>
                         {% endif %}
                     </div>
                 </div>
+                {% else %}
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- Destino Interno (Direção) -->
+                    <div class="space-y-1.5 sga-form-group focus-within:text-sga-red transition-colors">
+                        <label class="text-xs font-bold text-slate-600 uppercase tracking-wider block mb-1">
+                            {{ form.departamento_destino.label }}
+                        </label>
+                        {{ form.departamento_destino }}
+                        <p class="form-help text-[10px] text-slate-400 font-medium mt-1 italic">Interno ao Órgão</p>
+                        {% if form.departamento_destino.errors %}
+                            <div class="text-[10px] text-red-500 font-bold mt-1">{{ form.departamento_destino.errors }}</div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Destino Secção -->
+                    <div class="space-y-1.5 sga-form-group focus-within:text-sga-red transition-colors">
+                        <label class="text-xs font-bold text-slate-600 uppercase tracking-wider block mb-1">
+                            {{ form.seccao_destino.label }}
+                            <span class="text-emerald-500 font-black ml-1">★</span>
+                        </label>
+                        {{ form.seccao_destino }}
+                        <p class="form-help text-[10px] text-slate-400 font-medium mt-1 italic">Unidade Técnica</p>
+                        {% if form.seccao_destino.errors %}
+                            <div class="text-[10px] text-red-500 font-bold mt-1">{{ form.seccao_destino.errors }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
 
                 <div class="space-y-1.5 focus-within:text-sga-red transition-colors">
                     <label class="text-xs font-bold text-slate-600 uppercase tracking-wider block mb-1">Seu Parecer Técnico / Orientação</label>
@@ -167,6 +207,7 @@
 
             // Inicializar Select2
             $(document).ready(function() {
+                const $hierSelect = $('select[name="destino_hierarquico"]');
                 const $deptSelect = $('select[name="departamento_destino"]');
                 const $seccaoSelect = $('select[name="seccao_destino"]');
 
@@ -177,27 +218,42 @@
                 }).on('change', handleExclusivity);
 
                 function handleExclusivity() {
+                    const hierVal = $hierSelect.val();
                     const deptVal = $deptSelect.val();
                     const seccaoVal = $seccaoSelect.val();
 
-                    if (deptVal) {
-                        $seccaoSelect.prop('disabled', true);
-                        $seccaoSelect.next('.select2-container').css('opacity', '0.2').css('pointer-events', 'none');
-                        $seccaoSelect.closest('.space-y-1.5').find('.form-help').text('⚠️ BLOQUEADO');
+                    // Se qualquer um estiver preenchido, bloqueia os outros dois
+                    if (hierVal) {
+                        lock($deptSelect); lock($seccaoSelect);
+                    } else if (deptVal) {
+                        lock($hierSelect); lock($seccaoSelect);
                     } else if (seccaoVal) {
-                        $deptSelect.prop('disabled', true);
-                        $deptSelect.next('.select2-container').css('opacity', '0.2').css('pointer-events', 'none');
-                        $deptSelect.closest('.space-y-1.5').find('.form-help').text('⚠️ BLOQUEADO');
+                        lock($hierSelect); lock($deptSelect);
                     } else {
-                        $deptSelect.prop('disabled', false).next('.select2-container').css('opacity', '1').css('pointer-events', 'auto');
-                        $seccaoSelect.prop('disabled', false).next('.select2-container').css('opacity', '1').css('pointer-events', 'auto');
-                        $deptSelect.closest('.space-y-1.5').find('.form-help').text('Gabinete Central');
-                        $seccaoSelect.closest('.space-y-1.5').find('.form-help').text('Secção Especializada');
+                        unlock($hierSelect); unlock($deptSelect); unlock($seccaoSelect);
                     }
+                }
+
+                function lock($el) {
+                    $el.prop('disabled', true);
+                    $el.next('.select2-container').css('opacity', '0.2').css('pointer-events', 'none');
+                    $el.closest('.space-y-1.5').find('.form-help').text('⚠️ BLOQUEADO');
+                }
+
+                function unlock($el) {
+                    $el.prop('disabled', false).next('.select2-container').css('opacity', '1').css('pointer-events', 'auto');
+                    // Restaurar texto original (aproximado)
+                    const name = $el.attr('name');
+                    let help = "";
+                    if (name === 'destino_hierarquico') help = "Entidade Externa";
+                    if (name === 'departamento_destino') help = "Interno ao Órgão";
+                    if (name === 'seccao_destino') help = "Unidade Técnica";
+                    $el.closest('.space-y-1.5').find('.form-help').text(help);
                 }
                 
                 // Allow submitting disabled fields
                 $('form').on('submit', function() {
+                    $hierSelect.prop('disabled', false);
                     $deptSelect.prop('disabled', false);
                     $seccaoSelect.prop('disabled', false);
                 });
