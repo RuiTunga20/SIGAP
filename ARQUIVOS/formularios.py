@@ -327,11 +327,17 @@ class CustomUserCreationForm(UserCreationForm):
         )
 
     def __init__(self, *args, **kwargs):
+        self.admin_user = kwargs.pop('admin_user', None)
         super().__init__(*args, **kwargs)
         
         self.fields['username'].widget.attrs.update({'class': 'form-control'})
         self.fields['password1'].widget.attrs.update({'class': 'form-control'})
         self.fields['password2'].widget.attrs.update({'class': 'form-control'})
+
+        # Filtrar níveis de acesso pelo tipo de administração
+        if self.admin_user and self.admin_user.administracao:
+            tipo = self.admin_user.administracao.tipo_municipio
+            self.fields['nivel_acesso'].choices = CustomUser.niveis_para_tipo(tipo)
 
         # Popular departamentos se administração estiver presente
         if 'administracao' in self.data:
@@ -482,6 +488,11 @@ class CriarUsuarioAdminForm(UserCreationForm):
             'class': 'form-control',
             'placeholder': 'Confirmar senha'
         })
+
+        # Filtrar níveis de acesso pelo tipo de administração do admin logado
+        if self.admin_user and self.admin_user.administracao:
+            tipo = self.admin_user.administracao.tipo_municipio
+            self.fields['nivel_acesso'].choices = CustomUser.niveis_para_tipo(tipo)
 
         # Filtrar departamentos pela administração do admin logado
         if self.admin_user and self.admin_user.administracao:

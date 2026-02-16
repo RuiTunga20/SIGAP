@@ -101,14 +101,13 @@ ASGI_APPLICATION = 'SGA.asgi.application'
 # =============================================================================
 
 # Redis URL para Channel Layer
-REDIS_URL = os.environ.get('REDIS_URL', 'redis://redis:6379/0')
+REDIS_URL = os.environ.get('REDIS_URL')
 
 CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
-        "hosts": ["redis://red-d65mrnp4tr6s73d5gk80:6379",]
-
+            "hosts": [REDIS_URL,],
         },
     },
 }
@@ -125,40 +124,25 @@ CHANNEL_LAYERS = {
 # DATABASE CONFIGURATION
 # =============================================================================
 
-# Verificar se há DATABASE_URL (Docker/Produção)
+import dj_database_url
+
+# No Render (produção): usar DATABASE_URL (link INTERNO, mais rápido)
+# Localmente: usar link EXTERNO do Render
 DATABASE_URL = os.environ.get('DATABASE_URL')
 
 if DATABASE_URL:
-    # Parse DATABASE_URL para PostgreSQL
-    # Formato: postgres://user:password@host:port/dbname
-    import re
-    match = re.match(r'postgres://([^:]+):([^@]+)@([^:]+):(\d+)/(.+)', DATABASE_URL)
-    if match:
-        DATABASES = {
-            'default': {
-                'ENGINE': 'django.db.backends.postgresql',
-                'NAME': match.group(5),
-                'USER': match.group(1),
-                'PASSWORD': match.group(2),
-                'HOST': match.group(3),
-                'PORT': match.group(4),
-            }
-        }
-    else:
-        # Fallback para SQLite
-        DATABASES = {
-            'default': {
-                'ENGINE': 'django.db.backends.sqlite3',
-                'NAME': BASE_DIR / 'db.sqlite3',
-            }
-        }
-else:
-    # Desenvolvimento local com SQLite
+    # Produção (Render) — link interno configurado como variável de ambiente
     DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': BASE_DIR / 'db.sqlite3',
-        }
+        'default': dj_database_url.parse(DATABASE_URL, conn_max_age=600, conn_health_checks=True)
+    }
+else:
+    # Desenvolvimento local — link EXTERNO do Render
+    DATABASES = {
+        'default': dj_database_url.parse(
+            "postgresql://bd_sigap_user:Przc8aVgran8ZwDp0oWsozmf6xaFNQCj@dpg-d6960jusb7us73clm9j0-a.virginia-postgres.render.com/bd_sigap",
+            conn_max_age=600,
+            conn_health_checks=True,
+        )
     }
 
 

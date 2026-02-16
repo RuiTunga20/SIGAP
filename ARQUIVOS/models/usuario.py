@@ -63,21 +63,81 @@ class CustomUser(AbstractUser):
     objects = UsuarioManager()
 
     NIVEL_CHOICES = [
-        # Níveis de Gestão
+        # --- Gestão (todos os tipos) ---
         ('admin_sistema', 'Administrador de Sistema'),
-        ('admin_municipal', 'Administrador Municipal'),
-        ('diretor_municipal', 'Director Municipal'),
-        ('chefe_gabinete', 'Chefe de Gabinete'),
-        ('chefe_seccao', 'Chefe de Secção'),
-        ('supervisor', 'Supervisor'),
 
-        # Níveis Operacionais
-        ('tecnico', 'Técnico Superior/Especialista'),
-        ('escriturario', 'Assistente Técnico/Escriturário'),
-        ('operador', 'Operador'),
+        # --- Gestão MAT ---
+        ('ministro', 'Ministro'),
+        ('secretario_estado', 'Secretário de Estado'),
+
+        # --- Gestão Governo ---
+        ('governador', 'Governador Provincial'),
+        ('vice_governador', 'Vice-Governador'),
+
+        # --- Gestão Administração Municipal ---
+        ('admin_municipal', 'Administrador Municipal'),
+        ('admin_adjunto', 'Administrador Adjunto'),
+
+        # --- Direcção MAT ---
+        ('diretor_nacional', 'Director Nacional e Equiparado'),
+
+        # --- Direcção MAT + Governo ---
+        ('chefe_departamento', 'Chefe de Departamento'),
+
+        # --- Direcção Governo ---
+        ('diretor_gabinete', 'Director de Gabinete Provincial e Equiparado'),
+
+        # --- Direcção Administração Municipal ---
+        ('diretor_municipal', 'Director Municipal e Equiparado'),
+        ('chefe_seccao', 'Chefe de Secção'),
+
+        # --- Operacional (todos os tipos) ---
+        ('tecnico', 'Técnico'),
     ]
 
-    nivel_acesso = models.CharField(max_length=30, choices=NIVEL_CHOICES, default='operador')
+    # ============================================================
+    # Constantes de Grupo de Permissões
+    # ============================================================
+    NIVEIS_GESTAO = [
+        'admin_sistema',
+        'ministro', 'secretario_estado',
+        'governador', 'vice_governador',
+        'admin_municipal', 'admin_adjunto',
+    ]
+
+    NIVEIS_DIRECAO = [
+        'diretor_nacional', 'chefe_departamento',
+        'diretor_gabinete',
+        'diretor_municipal', 'chefe_seccao',
+    ]
+
+    NIVEIS_TECNICO = ['tecnico']
+
+    # ============================================================
+    # Mapeamento: Tipo de Administração → Níveis permitidos
+    # ============================================================
+    NIVEIS_POR_TIPO = {
+        'M': [  # MAT / Ministério
+            'admin_sistema', 'ministro', 'secretario_estado',
+            'diretor_nacional', 'chefe_departamento', 'tecnico',
+        ],
+        'G': [  # Governo Provincial
+            'admin_sistema', 'governador', 'vice_governador',
+            'diretor_gabinete', 'chefe_departamento', 'tecnico',
+        ],
+        '_default': [  # Administrações Municipais (A-E)
+            'admin_sistema', 'admin_municipal', 'admin_adjunto',
+            'diretor_municipal', 'chefe_seccao', 'tecnico',
+        ],
+    }
+
+    @classmethod
+    def niveis_para_tipo(cls, tipo_municipio):
+        """Retorna os NIVEL_CHOICES filtrados pelo tipo de administração."""
+        codigos = cls.NIVEIS_POR_TIPO.get(tipo_municipio, cls.NIVEIS_POR_TIPO['_default'])
+        return [(k, v) for k, v in cls.NIVEL_CHOICES if k in codigos]
+
+    nivel_acesso = models.CharField(max_length=30, choices=NIVEL_CHOICES, default='tecnico')
 
     # Departamento pode ser opcional se o usuário está em uma secção
     departamento = models.ForeignKey(

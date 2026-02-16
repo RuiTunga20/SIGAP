@@ -22,6 +22,9 @@ from ARQUIVOS.decorators import requer_contexto_hierarquico
 from django.db.models.functions import TruncDate, Now
 from django.db.models import Q, Count, Case, When, IntegerField, Value, BooleanField
 from django.db.models.functions import Now
+from django.http import FileResponse, Http404
+import mimetypes
+import os
 
 # Importações Locais
 from .models import (
@@ -323,16 +326,8 @@ def listar_movimentações(request):
         'usuario'
     ).filter(usuario__administracao=user.administracao)
     
-    # Se for admin de sistema, vê tudo (opcional)
-    if user.nivel_acesso == 'admin_sistema':
-        documentos = MovimentacaoDocumento.objects.select_related(
-            'documento', 
-            'departamento_origem', 
-            'departamento_destino', 
-            'seccao_origem', 
-            'seccao_destino', 
-            'usuario'
-        ).all()
+    # O isolamento agora é garantido pelo filtro por administracao acima.
+    # Se for admin de sistema, ele vê o que foi filtrado para sua administração.
     dados = estatisticas_aggregate(user.departamento)
 
     # Filtro por nível de acesso
@@ -416,31 +411,22 @@ def detalhe_documento(request, documento_id):
     status_bloqueados = [StatusDocumento.ARQUIVADO, StatusDocumento.REPROVADO, 'concluido', StatusDocumento.APROVADO]
 
     if documento.status not in status_bloqueados:
+        # RESTRIÇÃO: Técnicos só podem REGISTAR, não encaminhar
+        if request.user.nivel_acesso in CustomUser.NIVEIS_TECNICO:
+            pode_encaminhar = False
         # Caso 1: Usuário está em uma SECÇÃO
-        if user_seccao:
-            # LÓGICA CORRIGIDA:
-            # O usuário só pode encaminhar se o documento estiver EXATAMENTE na sua secção.
-            # Se o documento foi para o Departamento (pai), o usuário da secção perde o controle.
+        elif user_seccao:
             pode_encaminhar = (documento.seccao_atual == user_seccao)
-
         # Caso 2: Usuário está DIRETO no DEPARTAMENTO (sem secção)
         elif user_departamento:
-            # O usuário do departamento só mexe se o documento estiver no departamento
-            # E não estiver atribuído a nenhuma secção específica abaixo dele.
             pode_encaminhar = (
                     documento.departamento_atual == user_departamento and
                     documento.seccao_atual is None
             )
 
-    # VERIFICAR SE É ADMINISTRADOR (para despacho, aprovar, reprovar)
-    niveis_admin = [
-        'admin_sistema',
-        'admin_municipal',
-        'admin',
-        'diretor_municipal',
-        'diretor'
-    ]
-    e_administrador = request.user.nivel_acesso in niveis_admin
+
+    # VERIFICAR SE É GESTOR (para despacho, aprovar, reprovar)
+    e_administrador = request.user.nivel_acesso in CustomUser.NIVEIS_GESTAO
 
     # Buscar todas as movimentações para o histórico
     # Nota: 'observacoes' no seu código original parecia ser o histórico completo
@@ -1759,3 +1745,46 @@ def ajax_seccoes_departamento(request):
             pass
     
     return JsonResponse({'seccoes': seccoes})
+
+
+# =============================================================================
+# VISUALIZAR ARQUIVO (VIEW-ONLY, SEM DOWNLOAD)
+# =============================================================================
+
+@login_required
+def visualizar_arquivo(request, documento_id, tipo):
+    """
+    Serve o arquivo do documento inline no browser.
+    tipo='documento' → arquivo original (view-only, sem download)
+    tipo='despacho'  → arquivo_digitalizado (pode baixar)
+    """
+    documento = get_object_or_404(Documento, id=documento_id)
+    
+    if tipo == 'documento':
+        campo = documento.arquivo
+    elif tipo == 'despacho':
+        campo = documento.arquivo_digitalizado
+    else:
+        raise Http404("Tipo de arquivo inválido")
+    
+    if not campo:
+        raise Http404("Arquivo não encontrado")
+    
+    # Determinar content type
+    nome_arquivo = os.path.basename(campo.name)
+    content_type, _ = mimetypes.guess_type(nome_arquivo)
+    if not content_type:
+        content_type = 'application/octet-stream'
+    
+    response = FileResponse(campo.open('rb'), content_type=content_type)
+    
+    if tipo == 'documento':
+        # Inline: Abre no browser SEM prompt de download
+        response['Content-Disposition'] = f'inline; filename="{nome_arquivo}"'
+        # Headers extra para desencorajar download
+        response['X-Content-Type-Options'] = 'nosniff'
+    else:
+        # Despacho: Permite download
+        response['Content-Disposition'] = f'attachment; filename="{nome_arquivo}"'
+    
+    return response

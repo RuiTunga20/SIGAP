@@ -22,7 +22,8 @@ class DocumentoManager(SoftDeleteManager):
         qs = self.get_queryset()
 
         # 0. Regra de Ouro: Isolamento por Administração
-        if user.nivel_acesso != 'admin_sistema':
+        # UM USUÁRIO SÓ VÊ O QUE PERTENCE À SUA ADMINISTRAÇÃO OU TRAMITOU POR ELA
+        if not user.is_superuser or user.administracao:
             if not user.administracao:
                 return qs.none()
             
@@ -38,11 +39,10 @@ class DocumentoManager(SoftDeleteManager):
                 Q(movimentacoes__seccao_destino__departamento__administracao=user.administracao)
             ).distinct()
 
-        # 1. Admins da Administração veem tudo da sua admin
-        niveis_admin = ['admin_sistema', 'admin_municipal', 'admin', 'diretor', 'diretor_municipal']
-        if user.is_superuser or user.nivel_acesso in niveis_admin:
-            return qs
-
+        # 1. Admins veem tudo que está na POSSE ou HISTÓRICO da sua unidade
+        # (Não veem mais tudo da administração automaticamente se não forem de lá)
+        # niveis_admin = ['admin_sistema', 'admin_municipal', 'admin', 'diretor', 'diretor_municipal']
+        
         # 2. Usuário de Secção
         if hasattr(user, 'seccao') and user.seccao:
             # Vê APENAS se:
@@ -65,7 +65,7 @@ class DocumentoManager(SoftDeleteManager):
                 Q(movimentacoes__departamento_destino=user.departamento)
             ).distinct()
 
-        # 4. Fallback: Ver apenas seus próprios documentos criados se não tiver setor
+        # 4. Fallback: Ver apenas seus próprios documentos criados se não tiver setor (mas dentro da admin)
         return qs.filter(criado_por=user).distinct()
 
 

@@ -56,6 +56,9 @@ path('notificacoes/marcar-como-lidas/', views.marcar_notificacoes_como_lidas, na
     path('armazenamentos/', views.listar_armazenamentos, name='listar_armazenamentos'),
     path('documentos/<int:documento_id>/armazenamentos/', views.listar_armazenamentos, name='historico_armazenamento'),
 
+    # Visualização de Arquivos
+    path('documentos/<int:documento_id>/arquivo/<str:tipo>/', views.visualizar_arquivo, name='visualizar_arquivo'),
+
     # Gestão de Usuários (admin_sistema)
     path('administracao/usuarios/', views.gestao_usuarios, name='gestao_usuarios'),
     path('ajax/seccoes-departamento/', views.ajax_seccoes_departamento, name='ajax_seccoes_departamento'),

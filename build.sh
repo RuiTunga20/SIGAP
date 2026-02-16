@@ -15,6 +15,11 @@ python manage.py makemigrations
 python manage.py migrate
 
 # Popular Banco de Dados (Ordem Importante)
+
+echo "--- Populando Municípios ---"
+python manage.py populate_municipios
+
+echo "--- Populando MAT ---"
 python popular_mat.py
 
 echo "--- Populando Administrações ---"
@@ -23,6 +28,9 @@ python popular_governos.py
 
 echo "--- Populando Departamentos Base ---"
 python popular.py
+
+echo "--- Populando Departamentos e Secções (Decreto 270/24) ---"
+python popular_departamentos.py
 
 echo "--- Populando Tipos de Documentos ---"
 python tipodocumentos.py
@@ -34,15 +42,10 @@ python adicionar_adjuntos_tipo_c.py
 python adicionar_adjuntos_tipo_d.py
 python adicionar_adjuntos_tipo_e.py
 
-
-
-echo "--- Criando Usuário Padrão (Gestão) ---"
-# O usuário padrão Jorge agora pode ser criado manualmente ou via script específico se necessário
-# python manage.py populate_default_user
-
-echo "--- Criando Usuários Padrão das Administrações (Aduige/Govuige) ---"
+echo "--- Criando Usuários Padrão das Administrações ---"
 python criar_usuarios_padrao.py
 
 echo "--- Criando Super Admin MAT ---"
 python create_super_mat.py
 
+echo "✅ Build concluído com sucesso!"

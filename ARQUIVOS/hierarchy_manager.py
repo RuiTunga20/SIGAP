@@ -173,13 +173,19 @@ class HierarchyManager:
 
     def usuario_pode_encaminhar_externo(self):
         """Helper para verificar se o usuário pode enviar para fora da sua administração."""
+        from .models import CustomUser
+        
+        # Técnicos NUNCA podem encaminhar (nem interno nem externo)
+        if self.user.nivel_acesso in CustomUser.NIVEIS_TECNICO:
+            return False
+        
         # Permitir se for da Secretaria Geral
         if _is_secretaria_geral(self.ctx['dept']):
             return True
             
-        # OU se for um administrador (Sistema, Municipal ou Geral)
-        niveis_admin = ['admin_sistema', 'admin_municipal', 'admin']
-        if self.user.is_superuser or self.user.nivel_acesso in niveis_admin:
+        # OU se for um gestor ou director
+        niveis_permitidos = CustomUser.NIVEIS_GESTAO + CustomUser.NIVEIS_DIRECAO
+        if self.user.is_superuser or self.user.nivel_acesso in niveis_permitidos:
             return True
             
         return False
@@ -213,17 +219,16 @@ def _calcular_destinos_permitidos(user, ctx=None, incluir_self=True):
     seccao  = ctx['seccao']
     em_seccao = ctx['em_seccao']
 
-    # Superuser sem administração
+    # Superuser sem administração (Administrador de Infraestrutura)
     if not admin:
         if user.is_superuser:
-            depts = Departamento.objects.all().order_by('administracao__nome', 'nome')
-            if not incluir_self and dept:
-                depts = depts.exclude(pk=dept.pk)
-            
-            seccoes = Seccoes.objects.all().order_by('departamento__nome', 'nome')
-            if not incluir_self and seccao:
-                seccoes = seccoes.exclude(pk=seccao.pk)
-            
+            # Vê apenas o que pertence ao seu departamento/secção (se tiver)
+            # Se não tiver NADA, não vê nada de organização (não é gestor de conteúdo)
+            if not dept:
+                return Departamento.objects.none(), Seccoes.objects.none(), False
+                
+            depts = Departamento.objects.filter(pk=dept.pk)
+            seccoes = Seccoes.objects.filter(departamento=dept)
             return depts, seccoes, False
         
         return Departamento.objects.none(), Seccoes.objects.none(), False
