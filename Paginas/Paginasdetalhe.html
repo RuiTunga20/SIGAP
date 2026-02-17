@@ -173,8 +173,62 @@
                             <input type="hidden" name="action" value="encaminhar">
                             {{ encaminhar_form.tipo_movimentacao.as_hidden }}
 
-                            {% if encaminhar_form.show_external %}
-                            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            {% if encaminhar_form.non_field_errors %}
+                            <div class="bg-red-50 border-2 border-red-200 rounded-xl p-4 mb-4">
+                                {% for error in encaminhar_form.non_field_errors %}
+                                <p class="text-sm font-bold text-red-600 flex items-center gap-2">
+                                    <span>⚠️</span> {{ error }}
+                                </p>
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+
+                            {% if encaminhar_form.errors and not encaminhar_form.non_field_errors %}
+                            <div class="bg-amber-50 border-2 border-amber-200 rounded-xl p-4 mb-4">
+                                <p class="text-sm font-bold text-amber-700">⚠️ Erro no formulário. Verifique os campos abaixo.</p>
+                            </div>
+                            {% endif %}
+
+                            {% if encaminhar_form.is_governo_secretaria %}
+                            {# Layout 2x2 para Secretaria Geral de Governo #}
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                {# Linha 1, Col 1: Governos / MAT #}
+                                <div class="space-y-1.5 sga-form-group">
+                                    <label class="text-xs font-bold text-slate-600 uppercase tracking-wider block mb-1">
+                                        {{ encaminhar_form.destino_hierarquico.label }}
+                                    </label>
+                                    {{ encaminhar_form.destino_hierarquico }}
+                                    <p class="text-[10px] text-slate-400 font-medium mt-1 italic">Governo Provincial ou Ministério</p>
+                                </div>
+                                {# Linha 1, Col 2: Departamentos Internos #}
+                                <div class="space-y-1.5 sga-form-group">
+                                    <label class="text-xs font-bold text-slate-600 uppercase tracking-wider block mb-1">
+                                        {{ encaminhar_form.departamento_destino.label }}
+                                    </label>
+                                    {{ encaminhar_form.departamento_destino }}
+                                    <p class="text-[10px] text-slate-400 font-medium mt-1 italic">Interno ao Órgão</p>
+                                </div>
+                                {# Linha 2, Col 1: Administrações Municipais #}
+                                <div class="space-y-1.5 sga-form-group">
+                                    <label class="text-xs font-bold text-slate-600 uppercase tracking-wider block mb-1">
+                                        {{ encaminhar_form.destino_municipal.label }}
+                                    </label>
+                                    {{ encaminhar_form.destino_municipal }}
+                                    <p class="text-[10px] text-slate-400 font-medium mt-1 italic">Administração Municipal</p>
+                                </div>
+                                {# Linha 2, Col 2: Secções #}
+                                <div class="space-y-1.5 sga-form-group">
+                                    <label class="text-xs font-bold text-slate-600 uppercase tracking-wider block mb-1">
+                                        {{ encaminhar_form.seccao_destino.label }}
+                                        <span class="text-emerald-500 font-black ml-1">★</span>
+                                    </label>
+                                    {{ encaminhar_form.seccao_destino }}
+                                    <p class="text-[10px] text-slate-400 font-medium mt-1 italic">Unidade Técnica</p>
+                                </div>
+                            </div>
+                            {% elif encaminhar_form.show_external %}
+                            {# Layout 2x2 para outros utilizadores com acesso externo (MAT, Municipal, etc) #}
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div class="space-y-1.5 sga-form-group">
                                     <label class="text-xs font-bold text-slate-600 uppercase tracking-wider block mb-1">
                                         {{ encaminhar_form.destino_hierarquico.label }}
@@ -399,38 +453,43 @@
             const $hierSelect = $('select[name="destino_hierarquico"]');
             const $deptSelect = $('select[name="departamento_destino"]');
             const $seccaoSelect = $('select[name="seccao_destino"]');
+            const $muniSelect = $('select[name="destino_municipal"]');
 
             function handleExclusivity() {
                 const hierVal = $hierSelect.val();
                 const deptVal = $deptSelect.val();
                 const seccaoVal = $seccaoSelect.val();
+                const muniVal = $muniSelect.val();
 
                 if (hierVal) {
-                    lock($deptSelect); lock($seccaoSelect);
+                    lock($deptSelect); lock($seccaoSelect); lock($muniSelect);
+                } else if (muniVal) {
+                    lock($hierSelect); lock($deptSelect); lock($seccaoSelect);
                 } else if (deptVal) {
-                    lock($hierSelect); lock($seccaoSelect);
+                    lock($hierSelect); lock($seccaoSelect); lock($muniSelect);
                 } else if (seccaoVal) {
-                    lock($hierSelect); lock($deptSelect);
+                    lock($hierSelect); lock($deptSelect); lock($muniSelect);
                 } else {
-                    unlock($hierSelect); unlock($deptSelect); unlock($seccaoSelect);
+                    unlock($hierSelect); unlock($deptSelect); unlock($seccaoSelect); unlock($muniSelect);
                 }
             }
 
             function lock($el) {
                 $el.prop('disabled', true);
                 $el.next('.select2-container').css('opacity', '0.2').css('pointer-events', 'none');
-                $el.closest('.space-y-1.5').find('.form-help:not(.italic)').text('⚠️ BLOQUEADO');
+                $el.closest('.space-y-1\\.5').find('.form-help:not(.italic)').text('⚠️ BLOQUEADO');
             }
 
             function unlock($el) {
                 $el.prop('disabled', false).next('.select2-container').css('opacity', '1').css('pointer-events', 'auto');
-                $el.closest('.space-y-1.5').find('.p.text-slate-400').text(''); // Reset logic if needed
+                $el.closest('.space-y-1\\.5').find('.p.text-slate-400').text(''); // Reset logic if needed
             }
 
             // Inicializar Select2
             $(document).ready(function() {
                 $('select').select2({
                     placeholder: 'Seleccione o destino...',
+                    allowClear: true,
                     width: '100%'
                 }).on('change', handleExclusivity);
 
@@ -506,10 +565,37 @@
                     $hierSelect.prop('disabled', false);
                     $deptSelect.prop('disabled', false);
                     $seccaoSelect.prop('disabled', false);
+                    $muniSelect.prop('disabled', false);
                 });
             });
         });
     </script>
+
+    <!-- Django Messages via Toastify -->
+    {% if messages %}
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        {% for message in messages %}
+        if (typeof Toastify === 'function') {
+            Toastify({
+                text: "{% if message.tags == 'success' %}✅{% elif message.tags == 'error' %}❌{% elif message.tags == 'warning' %}⚠️{% else %}ℹ️{% endif %} {{ message|escapejs }}",
+                duration: 5000,
+                gravity: "top",
+                position: "right",
+                style: {
+                    background: "{% if message.tags == 'success' %}linear-gradient(135deg, #10b981, #059669){% elif message.tags == 'error' %}linear-gradient(135deg, #ef4444, #dc2626){% elif message.tags == 'warning' %}linear-gradient(135deg, #f59e0b, #d97706){% else %}linear-gradient(135deg, #6366f1, #4f46e5){% endif %}",
+                    borderRadius: "16px",
+                    fontWeight: "700",
+                    fontSize: "13px",
+                    padding: "16px 24px",
+                    boxShadow: "0 10px 25px rgba(0,0,0,0.15)"
+                }
+            }).showToast();
+        }
+        {% endfor %}
+    });
+    </script>
+    {% endif %}
 
     <!-- AJAX Form Submission (No Page Refresh) -->
     <script>

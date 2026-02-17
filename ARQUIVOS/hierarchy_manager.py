@@ -159,7 +159,7 @@ class HierarchyManager:
         # Governo Provincial
         if admin.tipo_municipio == 'G':
             return Administracao.objects.filter(
-                Q(provincia=admin.provincia) | Q(tipo_municipio='M')
+                Q(provincia=admin.provincia) | Q(tipo_municipio__in=['M', 'G'])
             ).exclude(pk=admin.pk)
             
         # Administração Municipal (Apenas se for Secretaria Geral, vê seu Governo)
@@ -172,20 +172,16 @@ class HierarchyManager:
         return Administracao.objects.none()
 
     def usuario_pode_encaminhar_externo(self):
-        """Helper para verificar se o usuário pode enviar para fora da sua administração."""
+        """Helper para verificar se o usuário pode enviar para fora da sua administração.
+        RESTRITO: Apenas utilizadores na Secretaria Geral."""
         from .models import CustomUser
         
         # Técnicos NUNCA podem encaminhar (nem interno nem externo)
         if self.user.nivel_acesso in CustomUser.NIVEIS_TECNICO:
             return False
         
-        # Permitir se for da Secretaria Geral
+        # APENAS Secretaria Geral pode encaminhar externamente
         if _is_secretaria_geral(self.ctx['dept']):
-            return True
-            
-        # OU se for um gestor ou director
-        niveis_permitidos = CustomUser.NIVEIS_GESTAO + CustomUser.NIVEIS_DIRECAO
-        if self.user.is_superuser or self.user.nivel_acesso in niveis_permitidos:
             return True
             
         return False

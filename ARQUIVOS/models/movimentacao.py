@@ -119,6 +119,10 @@ class MovimentacaoDocumento(models.Model):
             # Caso 2: Governo -> Ministério (qualquer província)
             if admin_origem.tipo_municipio == 'G' and admin_destino.tipo_municipio == 'M':
                 return True
+            
+            # Caso 2.5: Governo -> Governo (qualquer província)
+            if admin_origem.tipo_municipio == 'G' and admin_destino.tipo_municipio == 'G':
+                return True
                 
             # --- Regras que exigem mesma província ---
             if admin_origem.provincia != admin_destino.provincia:

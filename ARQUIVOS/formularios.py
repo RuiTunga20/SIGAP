@@ -135,20 +135,31 @@ class EncaminharDocumentoForm(forms.ModelForm):
             'tipo_movimentacao': forms.Select(attrs={'class': 'form-control'}),
             'departamento_destino': forms.Select(attrs={
                 'class': 'form-control',
-                'data-exclusive': 'seccao_destino,destino_hierarquico'
+                'data-exclusive': 'seccao_destino,destino_hierarquico,destino_municipal'
             }),
             'seccao_destino': forms.Select(attrs={
                 'class': 'form-control',
-                'data-exclusive': 'departamento_destino,destino_hierarquico'
+                'data-exclusive': 'departamento_destino,destino_hierarquico,destino_municipal'
             }),
         }
 
     destino_hierarquico = forms.ModelChoiceField(
         queryset=Administracao.objects.none(),
         required=False,
+        label='Governo / MAT',
         widget=forms.Select(attrs={
             'class': 'form-control',
-            'data-exclusive': 'departamento_destino,seccao_destino'
+            'data-exclusive': 'departamento_destino,seccao_destino,destino_municipal'
+        })
+    )
+
+    destino_municipal = forms.ModelChoiceField(
+        queryset=Administracao.objects.none(),
+        required=False,
+        label='Administração Municipal',
+        widget=forms.Select(attrs={
+            'class': 'form-control',
+            'data-exclusive': 'departamento_destino,seccao_destino,destino_hierarquico'
         })
     )
 
@@ -180,7 +191,25 @@ class EncaminharDocumentoForm(forms.ModelForm):
             # Filtrar departamentos para serem apenas INTERNOS (mesma administração)
             qs_dept_interno = qs_dept_permitidos.filter(administracao=self.user.administracao)
             
-            self.fields['destino_hierarquico'].queryset = qs_hierarquico
+            # Verificar se é Secretaria Geral de um Governo
+            from .hierarchy_manager import _is_secretaria_geral
+            user_admin = self.user.administracao
+            is_gov = user_admin and user_admin.tipo_municipio == 'G'
+            is_sec_geral = _is_secretaria_geral(getattr(self.user, 'departamento_efetivo', None))
+            self.is_governo_secretaria = is_gov and is_sec_geral and self.show_external
+            
+            if self.is_governo_secretaria:
+                # Separar destinos: Governos/MAT vs Administrações Municipais
+                self.fields['destino_hierarquico'].queryset = qs_hierarquico.filter(
+                    tipo_municipio__in=['G', 'M']
+                )
+                self.fields['destino_municipal'].queryset = qs_hierarquico.exclude(
+                    tipo_municipio__in=['G', 'M']
+                )
+            else:
+                self.fields['destino_hierarquico'].queryset = qs_hierarquico
+                self.fields['destino_municipal'].queryset = Administracao.objects.none()
+            
             self.fields['departamento_destino'].queryset = qs_dept_interno
             self.fields['seccao_destino'].queryset = qs_sec
             
@@ -219,38 +248,54 @@ class EncaminharDocumentoForm(forms.ModelForm):
             self.fields['destino_hierarquico'].label = labels['hierarquico']
             self.fields['departamento_destino'].label = labels['departamento']
             self.fields['seccao_destino'].label = labels['seccao']
+            
+            # Sobrescrever labels para Governo Secretaria (layout 2x2)
+            if self.is_governo_secretaria:
+                self.fields['destino_hierarquico'].label = 'Governo / MAT'
+                self.fields['destino_municipal'].label = 'Administração Municipal'
         else:
             self.fields['destino_hierarquico'].queryset = Administracao.objects.none()
+            self.fields['destino_municipal'].queryset = Administracao.objects.none()
             self.fields['departamento_destino'].queryset = Departamento.objects.none()
             self.fields['seccao_destino'].queryset = Seccoes.objects.none()
             self.seccoes_fixas = False
             self.seccoes_data = None
+            self.is_governo_secretaria = False
 
         self.fields['seccao_destino'].label_from_instance = lambda obj: obj.nome
         self.fields['destino_hierarquico'].label_from_instance = lambda obj: obj.nome
+        self.fields['destino_municipal'].label_from_instance = lambda obj: obj.nome
 
     def clean(self):
         cleaned_data = super().clean()
         dest_hierarquico = cleaned_data.get('destino_hierarquico')
+        dest_municipal = cleaned_data.get('destino_municipal')
         dept_destino = cleaned_data.get('departamento_destino')
         sec_destino = cleaned_data.get('seccao_destino')
         tipo_mov = cleaned_data.get('tipo_movimentacao')
 
         if tipo_mov == 'encaminhamento':
             # Contar quantos destinos foram selecionados
-            selecionados = [d for d in [dest_hierarquico, dept_destino, sec_destino] if d]
+            selecionados = [d for d in [dest_hierarquico, dest_municipal, dept_destino, sec_destino] if d]
             
             if len(selecionados) == 0:
-                raise ValidationError('Selecione um destino (Governo, Direção ou Secção).')
+                raise ValidationError('Selecione um destino (Governo, Administração, Direção ou Secção).')
             
             if len(selecionados) > 1:
                 raise ValidationError('Escolha APENAS UM destino.')
 
-            # Se for destino hierárquico, validar e converter internamente
+            # Se for destino hierárquico (Governo/MAT), validar e converter
             if dest_hierarquico:
                 sec_geral = obter_secretaria_geral(dest_hierarquico)
                 if not sec_geral:
                     raise ValidationError(f'A administração {dest_hierarquico.nome} não possui uma Secretaria Geral configurada para receber documentos.')
+                cleaned_data['departamento_destino'] = sec_geral
+            
+            # Se for destino municipal, validar e converter da mesma forma
+            if dest_municipal:
+                sec_geral = obter_secretaria_geral(dest_municipal)
+                if not sec_geral:
+                    raise ValidationError(f'A administração {dest_municipal.nome} não possui uma Secretaria Geral configurada para receber documentos.')
                 cleaned_data['departamento_destino'] = sec_geral
             
         return cleaned_data
