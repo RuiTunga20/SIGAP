@@ -70,6 +70,7 @@
             background: #f8fafc !important;
         }
     </style>
+    {{ form.media }}
 </head>
 <body class="h-full">
     {% include "menu.html" %}
@@ -243,7 +244,8 @@
 
             // Estilizar inputs via JS (Aurora Premium)
             document.querySelectorAll('input:not([type="hidden"]), select, textarea').forEach(el => {
-                if (!el.classList.contains('select2-hidden-accessible')) {
+                // IGNORAR campos que pertencem ao TinyMCE (evita quebrar o editor rico)
+                if (!el.classList.contains('select2-hidden-accessible') && !el.id.includes('tinymce') && !el.classList.contains('tinymce')) {
                     el.className = "block w-full h-[60px] px-6 py-4 bg-slate-50 border-2 border-slate-100/50 focus:bg-white focus:ring-4 focus:ring-sga-red/10 focus:border-red-500/30 rounded-2xl text-sm font-bold transition-all outline-none text-slate-700 placeholder:text-slate-300 shadow-inner appearance-none";
                 }
             });

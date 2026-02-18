@@ -33,7 +33,7 @@ from .models import (
 )
 from .formularios import (
     DocumentoForm, EncaminharDocumentoForm, DespachoForm,
-    ArmazenamentoDocumentoForm
+    ArmazenamentoDocumentoForm, DistribuirDocumentoForm
 )
 from .decorators import requer_contexto_hierarquico, requer_mesma_administracao
 from .consumers import send_notification_sync, send_pendencia_update_sync
@@ -411,11 +411,12 @@ def detalhe_documento(request, documento_id):
     status_bloqueados = [StatusDocumento.ARQUIVADO, StatusDocumento.REPROVADO, 'concluido', StatusDocumento.APROVADO]
 
     if documento.status not in status_bloqueados:
-        # RESTRIÇÃO: Técnicos só podem REGISTAR, não encaminhar
-        if request.user.nivel_acesso in CustomUser.NIVEIS_TECNICO:
-            pode_encaminhar = False
+        # RESTRIÇÃO: Técnicos AGORA PODEM encaminhar (apenas para Chefia, controlado via Form e HierarchyManager)
+        # if request.user.nivel_acesso in CustomUser.NIVEIS_TECNICO:
+        #     pode_encaminhar = False
+        
         # Caso 1: Usuário está em uma SECÇÃO
-        elif user_seccao:
+        if user_seccao:
             pode_encaminhar = (documento.seccao_atual == user_seccao)
         # Caso 2: Usuário está DIRETO no DEPARTAMENTO (sem secção)
         elif user_departamento:
@@ -452,10 +453,55 @@ def detalhe_documento(request, documento_id):
     # Instanciar formulários iniciais (GET)
     encaminhar_form = EncaminharDocumentoForm(user=request.user, documento=documento)
     despacho_form = DespachoForm()
+    
+    # Lógica de Distribuição (Chefia -> Técnico)
+    pode_distribuir = False
+    distribuir_form = None
+    if getattr(request.user, 'pode_distribuir', lambda: False)() and pode_encaminhar:
+        pode_distribuir = True
+        distribuir_form = DistribuirDocumentoForm(user=request.user)
 
     # --- INÍCIO DO TRATAMENTO POST ---
     if request.method == 'POST':
         action = request.POST.get('action')
+        
+        # === AÇÃO 0: DISTRIBUIR (Novo fluxo Chefia -> Técnico) ===
+        if action == 'distribuir':
+            if not pode_distribuir:
+                 messages.error(request, 'Sem permissão para distribuir.')
+                 return redirect('detalhe_documento', documento_id=documento.id)
+            
+            distribuir_form = DistribuirDocumentoForm(request.POST, user=request.user)
+            if distribuir_form.is_valid():
+                tecnico = distribuir_form.cleaned_data['tecnico']
+                obs = distribuir_form.cleaned_data['observacoes']
+                
+                # 1. Atribuir Responsável Atual
+                documento.responsavel_atual = tecnico
+                documento.save()
+                
+                # 2. Registar Movimentação Interna (Para histórico)
+                MovimentacaoDocumento.objects.create(
+                     documento=documento,
+                     tipo_movimentacao='encaminhamento', # Usamos encaminhamento para manter consistência
+                     usuario=request.user,
+                     departamento_origem=user_departamento,
+                     departamento_destino=user_departamento, # Fica no mesmo sítio
+                     seccao_origem=user_seccao,
+                     seccao_destino=user_seccao, # Fica no mesmo sítio
+                     observacoes=f"ATRIBUIÇÃO INTERNA para {tecnico.get_full_name()}: {obs}",
+                     confirmado_recebimento=True # Auto-aceite pois é interno
+                )
+                
+                # 3. Notificar Técnico
+                link = request.build_absolute_uri(reverse('detalhe_documento', args=[documento.id]))
+                Notificacao.objects.create(
+                    usuario=tecnico,
+                    mensagem=f"Documento atribuído a si: {documento.titulo}",
+                    link=link
+                )
+                messages.success(request, f"Documento distribuído para {tecnico.get_full_name()}.")
+                return redirect('detalhe_documento', documento_id=documento.id)
 
         # === AÇÃO 1: ENCAMINHAR DOCUMENTO ===
         if action == 'encaminhar':
@@ -774,6 +820,8 @@ def detalhe_documento(request, documento_id):
         'e_administrador': e_administrador,
         'encaminhar_form': encaminhar_form,
         'despacho_form': despacho_form,
+        'distribuir_form': distribuir_form,
+        'pode_distribuir': pode_distribuir,
         'observacoes': observacoes,
     }
 

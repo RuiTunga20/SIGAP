@@ -1,4 +1,5 @@
 from django.db import models
+from tinymce.models import HTMLField
 from django.conf import settings
 from django.core.validators import RegexValidator, FileExtensionValidator
 from django.core.exceptions import ValidationError
@@ -177,7 +178,7 @@ class Anexo(models.Model):
     documento = models.ForeignKey(Documento, on_delete=models.CASCADE, related_name='anexos')
     arquivo = models.FileField(upload_to='anexos/%Y/%m/')
     nome = models.CharField(max_length=200)
-    descricao = models.TextField(blank=True)
+    descricao = HTMLField(blank=True)
     usuario_upload = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
     data_upload = models.DateTimeField(auto_now_add=True)
 

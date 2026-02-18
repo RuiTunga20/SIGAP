@@ -139,6 +139,21 @@ class CustomUser(AbstractUser):
 
     nivel_acesso = models.CharField(max_length=30, choices=NIVEL_CHOICES, default='tecnico')
 
+    # Nível de Sigilo para Confidencialidade e Hierarquia
+    # 0 = Técnico (Vê apenas atribuídos/públicos)
+    # 1 = Chefia (Vê tudo do setor + Restritos)
+    # 2 = Direção (Vê tudo + Confidenciais)
+    nivel_sigilo = models.IntegerField(default=0, help_text="0=Técnico, 1=Chefia, 2=Direção")
+
+    def pode_distribuir(self):
+        """Retorna True se o usuário pode distribuir documentos (Chefia/Direção)."""
+        return self.nivel_sigilo >= 1
+
+    @property
+    def eh_tecnico(self):
+        """Retorna True se for apenas técnico (nível 0)."""
+        return self.nivel_sigilo == 0
+
     # Departamento pode ser opcional se o usuário está em uma secção
     departamento = models.ForeignKey(
         'Departamento',

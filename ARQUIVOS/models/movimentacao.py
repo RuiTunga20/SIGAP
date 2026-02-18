@@ -1,4 +1,5 @@
 from django.db import models
+from tinymce.models import HTMLField
 from django.conf import settings
 from django.core.exceptions import ValidationError
 

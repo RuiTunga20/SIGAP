@@ -21,17 +21,11 @@ class DocumentoManager(SoftDeleteManager):
         """
         qs = self.get_queryset()
 
-        # 0. Regra de Ouro: Isolamento por Administração
-        # UM USUÁRIO SÓ VÊ O QUE PERTENCE À SUA ADMINISTRAÇÃO OU TRAMITOU POR ELA
-        if not user.is_superuser or user.administracao:
+        if not user.is_superuser and user.administracao:
             if not user.administracao:
                 return qs.none()
             
-            # Filtramos pelo campo direto no documento para garantir isolamento Multi-Tenant
-            # MAS: Permitimos ver se:
-            # 1. O documento pertence à minha administração (Origem)
-            # 2. O documento está atualmente na minha administração (Destino Atual)
-            # 3. O documento já tramitou pela minha administração (Histórico)
+            # Filtro Multi-Tenant: Apenas documentos da administração
             qs = qs.filter(
                 Q(administracao=user.administracao) | 
                 Q(departamento_atual__administracao=user.administracao) |
@@ -39,33 +33,35 @@ class DocumentoManager(SoftDeleteManager):
                 Q(movimentacoes__seccao_destino__departamento__administracao=user.administracao)
             ).distinct()
 
-        # 1. Admins veem tudo que está na POSSE ou HISTÓRICO da sua unidade
-        # (Não veem mais tudo da administração automaticamente se não forem de lá)
-        # niveis_admin = ['admin_sistema', 'admin_municipal', 'admin', 'diretor', 'diretor_municipal']
+        # --- NOVA LÓGICA DE CONFIDENCIALIDADE E HIERARQUIA ---
         
-        # 2. Usuário de Secção
+        # Se for Técnico (Nível 0), aplica filtro restritivo "NEED-TO-KNOW"
+        if getattr(user, 'eh_tecnico', True): # Default True se não tiver atributo
+             return qs.filter(
+                Q(criado_por=user) |            # Meus documentos (criados)
+                Q(responsavel_atual=user)       # Atribuídos a mim (distribuídos)
+             ).distinct()
+
+        # Se for Chefia/Direção (Nivel >= 1), vê tudo do seu setor + Histórico
+        # (Mantém lógica original de setor, mas agora restrita a chefes)
+
+        # 2. Usuário de Secção (Chefia)
         if hasattr(user, 'seccao') and user.seccao:
-            # Vê APENAS se:
-            # - Está atualmente na sua secção
-            # - Já passou pela sua secção no passado (histórico)
             return qs.filter(
                 Q(seccao_atual=user.seccao) |
                 Q(movimentacoes__seccao_origem=user.seccao) |
                 Q(movimentacoes__seccao_destino=user.seccao)
             ).distinct()
 
-        # 3. Usuário de Departamento
+        # 3. Usuário de Departamento (Direção)
         if hasattr(user, 'departamento') and user.departamento:
-            # Vê se:
-            # - Está atualmente no seu departamento
-            # - Já passou pelo seu departamento no passado (histórico)
             return qs.filter(
                 Q(departamento_atual=user.departamento) |
                 Q(movimentacoes__departamento_origem=user.departamento) |
                 Q(movimentacoes__departamento_destino=user.departamento)
             ).distinct()
 
-        # 4. Fallback: Ver apenas seus próprios documentos criados se não tiver setor (mas dentro da admin)
+        # 4. Fallback
         return qs.filter(criado_por=user).distinct()
 
 

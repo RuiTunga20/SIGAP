@@ -177,7 +177,7 @@ class HierarchyManager:
         from .models import CustomUser
         
         # Técnicos NUNCA podem encaminhar (nem interno nem externo)
-        if self.user.nivel_acesso in CustomUser.NIVEIS_TECNICO:
+        if getattr(self.user, 'eh_tecnico', False):
             return False
         
         # APENAS Secretaria Geral pode encaminhar externamente
@@ -228,6 +228,25 @@ def _calcular_destinos_permitidos(user, ctx=None, incluir_self=True):
             return depts, seccoes, False
         
         return Departamento.objects.none(), Seccoes.objects.none(), False
+
+    # =========================================================================
+    # PARTE 0: Restrição para TÉCNICOS (Nível 0) - "NEED-TO-KNOW" & HIERARQUIA
+    # =========================================================================
+    # Técnicos NÃO escolhem destino livremente. Podem apenas "devolver" à chefia.
+    # A chefia está no mesmo Departamento ou Secção.
+    # Portanto, a única opção de destino é o PRÓPRIO local de trabalho.
+    if getattr(user, 'eh_tecnico', False):
+         if em_seccao:
+             # Se está em secção, só pode enviar para a PRÓPRIA secção (Chefia da Secção)
+             # Não vê departamentos.
+             return Departamento.objects.none(), Seccoes.objects.filter(pk=seccao.pk), False
+         elif dept:
+             # Se está em departamento (sem secção), só pode enviar para o PRÓPRIO departamento (Diretor)
+             # Não vê secções.
+             return Departamento.objects.filter(pk=dept.pk), Seccoes.objects.none(), False
+         else:
+             # Técnico sem alocação? Não envia nada.
+             return Departamento.objects.none(), Seccoes.objects.none(), False
 
     # =========================================================================
     # PARTE 1: Calcular queryset BASE de departamentos (hierarquia MAT/GOV/Municipal)

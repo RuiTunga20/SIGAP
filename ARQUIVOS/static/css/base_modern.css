@@ -2,7 +2,11 @@
    SGA AURORA - MODERN DESIGN SYSTEM (FASE 1)
    ============================================================================= */
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap');
+/* DESACTIVADO para ambiente local/offline (evita timeout de 20-30s)
+   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap');
+*/
+
+/* Fallback: usar fontes do sistema (rápido e funcional) */
 
 :root {
     /* Cores Institucionais Refinadas */

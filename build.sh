@@ -7,12 +7,14 @@ pip install --upgrade pip setuptools wheel
 pip install -r requirements.txt
 
 # Coletar arquivos estáticos
-# O WhiteNoise vai comprimir e preparar os arquivos aqui
 python manage.py collectstatic --no-input
 
 python manage.py makemigrations
 # Aplicar migrações do banco de dados
 python manage.py migrate
+
+# Arranque: gunicorn com uvicorn workers (definido no Procfile ou no Render dashboard)
+# gunicorn SGA.asgi:application --worker-class uvicorn.workers.UvicornWorker --workers 4 --bind 0.0.0.0:$PORT
 
 # Popular Banco de Dados (Ordem Importante)
 

@@ -11,6 +11,9 @@ from django.views.static import serve
 app_name = 'documentos'
 
 urlpatterns = [
+    # TinyMCE
+    path('tinymce/', include('tinymce.urls')),
+
     # Dashboard
     path('Painel-Control/', admin.site.urls),
 

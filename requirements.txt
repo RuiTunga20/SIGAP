@@ -6,7 +6,9 @@ sqlparse==0.4.4
 # Django Channels (WebSockets/ASGI)
 channels==4.0.0
 channels-redis==4.2.0
-daphne==4.1.0
+
+# ASGI Server (Uvicorn + Gunicorn para alta concorrência)
+uvicorn[standard]==0.29.0
 
 # Base de Dados
 psycopg2-binary==2.9.10
@@ -19,7 +21,7 @@ redis==5.0.1
 pillow==11.0.0
 python-dateutil==2.8.2
 
-# WSGI Server (backup)
+# Process Manager (gere múltiplos workers Uvicorn)
 gunicorn==21.2.0
 
 # Ambiente
@@ -31,3 +33,7 @@ whitenoise[brotli]==6.6.0
 
 # PDF Generation
 reportlab==4.1.0
+xhtml2pdf==0.2.17
+
+# Editor de Texto Rico
+django-tinymce==3.7.1

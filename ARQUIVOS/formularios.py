@@ -10,6 +10,7 @@ from django.contrib.auth.forms import UserCreationForm
 from django.db.models import Q
 from django import forms
 from django.core.exceptions import ValidationError
+from tinymce.widgets import TinyMCE
 
 from .models import (
     Documento,
@@ -31,6 +32,7 @@ from .hierarchy_manager import (
     validar_destino_encaminhamento,
     obter_label_dinamico,
     obter_secretaria_geral,
+    _get_contexto_usuario,
 )
 
 
@@ -46,7 +48,7 @@ class DocumentoForm(forms.ModelForm):
     class Meta:
         model = Documento
         fields = [
-            'titulo', 'tipo_documento', 'prioridade',
+            'titulo', 'conteudo', 'tipo_documento', 'prioridade',
             'arquivo', 'arquivo_digitalizado', 'tags', 'observacoes',
             'utente', 'telefone', 'email', 'origem', 'niveis', 'referencia',
         ]
@@ -92,11 +94,6 @@ class DocumentoForm(forms.ModelForm):
                 'placeholder': 'O numero do Armario pasta  Armario-1/doc-335',
                 'maxlength': '500'
             }),
-            'observacoes': forms.Textarea(attrs={
-                'class': 'form-textarea',
-                'rows': 3,
-                'placeholder': 'Observações adicionais'
-            }),
         }
 
 
@@ -126,11 +123,6 @@ class EncaminharDocumentoForm(forms.ModelForm):
                 'rows': 3,
                 'class': 'form-control',
                 'placeholder': 'Observações sobre o encaminhamento...',
-            }),
-            'despacho': forms.Textarea(attrs={
-                'rows': 4,
-                'class': 'form-control',
-                'placeholder': 'Despacho ou instruções...',
             }),
             'tipo_movimentacao': forms.Select(attrs={'class': 'form-control'}),
             'departamento_destino': forms.Select(attrs={
@@ -608,13 +600,9 @@ class DespachoForm(forms.Form):
     ]
 
     despacho = forms.CharField(
-        widget=forms.Textarea(attrs={
-            'class': 'form-control',
-            'rows': 5,
-            'placeholder': 'Digite seu despacho/parecer'
-        }),
         label='Despacho/Parecer',
-        required=True
+        required=True,
+        widget=TinyMCE(attrs={'cols': 80, 'rows': 5})
     )
 
     novo_status = forms.ChoiceField(
@@ -624,15 +612,7 @@ class DespachoForm(forms.Form):
         required=False
     )
 
-    observacoes = forms.CharField(
-        widget=forms.Textarea(attrs={
-            'class': 'form-control',
-            'rows': 2,
-            'placeholder': 'Observações adicionais (opcional)'
-        }),
-        label='Observações',
-        required=False
-    )
+    observacoes = forms.CharField(label='Observações', required=False)
 
 
 class BuscaAvancadaForm(forms.Form):
@@ -926,3 +906,39 @@ class ArmazenamentoDocumentoForm(forms.ModelForm):
             )
 
         return cleaned_data
+
+class DistribuirDocumentoForm(forms.Form):
+    """Formulário para chefia distribuir documento a um técnico."""
+    
+    tecnico = forms.ModelChoiceField(
+        queryset=CustomUser.objects.none(),
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        label='Atribuir ao Técnico',
+        required=True
+    )
+    
+    observacoes = forms.CharField(
+        widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+        label='Instruções / Observações',
+        required=False
+    )
+
+    def __init__(self, *args, **kwargs):
+        self.user = kwargs.pop('user', None)
+        super().__init__(*args, **kwargs)
+        
+        if self.user:
+            # Filtrar técnicos do mesmo setor que o usuário (Chefe)
+            ctx = _get_contexto_usuario(self.user)
+            dept = ctx['dept']
+            seccao = ctx['seccao']
+            
+            qs = CustomUser.objects.filter(is_active=True).exclude(pk=self.user.pk)
+            
+            if seccao:
+                qs = qs.filter(seccao=seccao)
+            elif dept:
+                qs = qs.filter(departamento=dept)
+                
+            self.fields['tecnico'].queryset = qs.order_by('first_name')
+            self.fields['tecnico'].label_from_instance = lambda u: f"{u.get_full_name()} ({u.username})"

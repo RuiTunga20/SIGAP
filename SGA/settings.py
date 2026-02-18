@@ -20,7 +20,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-r#f7)g%=rdp8ld331qv3q5-43qlivp_@^)r0tk8o!7ar3=_710')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get('DEBUG', 'False').lower() in ('true', '1', 'yes')
+DEBUG = os.environ.get('DEBUG', 'True').lower() in ('true', '1', 'yes')
 
 ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '192.168.0.213,localhost,127.0.0.1,0.0.0.0,192.168.1.191,192.168.1.192,sigap-1.onrender.com').split(',')
 
@@ -44,10 +44,9 @@ CSRF_TRUSTED_ORIGINS = list(filter(None, set(CSRF_TRUSTED_ORIGINS_ENV + CSRF_TRU
 # =============================================================================
 
 INSTALLED_APPS = [
-    # Django Channels (deve vir antes das apps Django)
-    'daphne',
+    # Django Channels (WebSockets/ASGI)
     'channels',
-    
+
     # Django Core
     'django.contrib.admin',
     'django.contrib.auth',
@@ -58,6 +57,9 @@ INSTALLED_APPS = [
     
     # Apps do Projeto
     'ARQUIVOS',
+
+    # Editor de Texto Rico
+    'tinymce',
 ]
 
 MIDDLEWARE = [
@@ -101,7 +103,7 @@ ASGI_APPLICATION = 'SGA.asgi.application'
 # =============================================================================
 
 # Redis URL para Channel Layer
-REDIS_URL = os.environ.get('REDIS_URL')
+REDIS_URL = os.environ.get('REDIS_URL', 'redis://redis:6379/0')
 
 CHANNEL_LAYERS = {
     "default": {
@@ -127,19 +129,19 @@ CHANNEL_LAYERS = {
 import dj_database_url
 
 # No Render (produção): usar DATABASE_URL (link INTERNO, mais rápido)
-# Localmente: usar link EXTERNO do Render
+# Localmente (sem Docker): usar BD PostgreSQL local (sga_db)
 DATABASE_URL = os.environ.get('DATABASE_URL')
 
 if DATABASE_URL:
-    # Produção (Render) — link interno configurado como variável de ambiente
+    # Produção (Render) ou Docker local — DATABASE_URL definida como variável de ambiente
     DATABASES = {
         'default': dj_database_url.parse(DATABASE_URL, conn_max_age=600, conn_health_checks=True)
     }
 else:
-    # Desenvolvimento local — link EXTERNO do Render
+    # Fallback local (sem Docker) — PostgreSQL local
     DATABASES = {
         'default': dj_database_url.parse(
-            "postgresql://bd_sigap_user:Przc8aVgran8ZwDp0oWsozmf6xaFNQCj@dpg-d6960jusb7us73clm9j0-a.virginia-postgres.render.com/bd_sigap",
+            "postgresql://sga_user:sga_password@localhost:5432/sga_db",
             conn_max_age=600,
             conn_health_checks=True,
         )
