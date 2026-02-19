@@ -7,7 +7,7 @@ class MovimentacaoDocumento(models.Model):
     TIPO_MOVIMENTACAO_CHOICES = [
         ('criacao', 'Criação'),
         ('recebimento', 'Recebimento'),
-        ('encaminhamento', 'Encaminhamento'),
+        ('encaminhamento', 'Encaminhado'),
         ('despacho', 'Despacho'),
         ('aprovado', 'Aprovado'),
         ('reprovado', 'Reprovado'),

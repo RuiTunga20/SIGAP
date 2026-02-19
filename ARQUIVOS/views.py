@@ -429,18 +429,27 @@ def detalhe_documento(request, documento_id):
     # VERIFICAR SE É GESTOR (para despacho, aprovar, reprovar)
     e_administrador = request.user.nivel_acesso in CustomUser.NIVEIS_GESTAO
 
-    # Buscar todas as movimentações para o histórico
-    # Nota: 'observacoes' no seu código original parecia ser o histórico completo
-    observacoes = MovimentacaoDocumento.objects.filter(documento=documento).order_by('-data_movimentacao')
+    # Lógica de Visibilidade Restrita (Garantir "Need-to-Know")
+    is_tecnico = request.user.nivel_sigilo < 1
+    
+    # Buscar todas as movimentações para o histórico (Pareceres e Observações)
+    # Técnicos vêem apenas movimentações entre departamentos (sem secção envolvida)
+    observacoes_qs = MovimentacaoDocumento.objects.filter(documento=documento)
+    if is_tecnico:
+        observacoes_qs = observacoes_qs.filter(seccao_destino__isnull=True, seccao_origem__isnull=True)
+    observacoes = observacoes_qs.order_by('-data_movimentacao')
 
-    # Buscar movimentações detalhadas (para display visual na template)
-    movimentacoes = documento.movimentacoes.all().select_related(
+    # Buscar movimentações detalhadas (Fluxo de Tramitação)
+    movimentacoes_qs = documento.movimentacoes.all().select_related(
         'usuario',
         'departamento_destino',
         'departamento_origem',
         'seccao_destino',
         'seccao_origem'
-    ).order_by('-data_movimentacao')
+    )
+    if is_tecnico:
+        movimentacoes_qs = movimentacoes_qs.filter(seccao_destino__isnull=True, seccao_origem__isnull=True)
+    movimentacoes = movimentacoes_qs.order_by('-data_movimentacao')
 
     # Movimentações pendentes de confirmação de recebimento
     # Filtra apenas o que chegou para o setor atual do usuário
