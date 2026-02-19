@@ -624,31 +624,45 @@ def detalhe_documento(request, documento_id):
                         )
                         
                         # Determinar destinatários (FILTRO POR ADMINISTRAÇÃO DO DESTINO)
-                        # IMPORTANTE: Agora o destino pode ser de OUTRA administração (Governo <-> Admin)
-                        # Então devemos filtrar usuários da administração DO DESTINO
-                        
                         admin_destino_obj = None
                         if movimentacao.seccao_destino:
                              admin_destino_obj = movimentacao.seccao_destino.departamento.administracao
                         elif movimentacao.departamento_destino:
                              admin_destino_obj = movimentacao.departamento_destino.administracao
                         
+                        # Filtro base de utilizadores
                         if movimentacao.seccao_destino:
-                            utilizadores = CustomUser.objects.filter(
+                            utilizadores_qs = CustomUser.objects.filter(
                                 seccao=movimentacao.seccao_destino,
-                                administracao=admin_destino_obj, # Usa a admin do destino!
+                                administracao=admin_destino_obj,
                                 is_active=True
                             )
                             destino_texto = f"secção {movimentacao.seccao_destino.nome}"
                             group_name = f"seccao_{movimentacao.seccao_destino.id}"
                         elif movimentacao.departamento_destino:
-                            utilizadores = CustomUser.objects.filter(
+                            utilizadores_qs = CustomUser.objects.filter(
                                 departamento=movimentacao.departamento_destino,
-                                administracao=admin_destino_obj, # Usa a admin do destino!
+                                administracao=admin_destino_obj,
                                 is_active=True
                             )
                             destino_texto = f"departamento {movimentacao.departamento_destino.nome}"
                             group_name = f"departamento_{movimentacao.departamento_destino.id}"
+
+                        # === LÓGICA DE NOTIFICAÇÃO PARA CHEFIA ===
+                        is_tecnico = request.user.nivel_sigilo < 1
+                        mesmo_setor = False
+                        
+                        if 'utilizadores_qs' in locals():
+                            if movimentacao.seccao_destino and request.user.seccao == movimentacao.seccao_destino:
+                                mesmo_setor = True
+                            elif movimentacao.departamento_destino and request.user.departamento == movimentacao.departamento_destino:
+                                mesmo_setor = True
+                            
+                            # Se for técnico enviando para o seu próprio setor, notifica APENAS chefia
+                            if is_tecnico and mesmo_setor:
+                                utilizadores = utilizadores_qs.filter(nivel_sigilo__gte=1)
+                            else:
+                                utilizadores = utilizadores_qs.exclude(id=request.user.id)
                         else:
                             utilizadores = []
                             group_name = None
@@ -888,26 +902,34 @@ def criar_documento(request):
                 observacoes='Documento criado no sistema'
             )
 
-            # === NOTIFICAÇÃO DE CRIAÇÃO ===
+            # === NOTIFICAÇÃO DE CRIAÇÃO (Focada na Chefia se for Técnico) ===
             link_documento = request.build_absolute_uri(
                 reverse('detalhe_documento', args=[documento.id])
             )
             
-            # Notifica usuários do próprio setor sobre a criação do novo documento
+            # Determinar quem deve ser notificado
+            is_tecnico = request.user.nivel_sigilo < 1
+            
             if seccao_usuario:
-                utilizadores = CustomUser.objects.filter(
+                utilizadores_qs = CustomUser.objects.filter(
                     seccao=seccao_usuario,
                     administracao=request.user.administracao,
                     is_active=True
-                ).exclude(id=request.user.id)
+                )
                 group_name = f"seccao_{seccao_usuario.id}"
             else:
-                utilizadores = CustomUser.objects.filter(
+                utilizadores_qs = CustomUser.objects.filter(
                     departamento=departamento_usuario,
                     administracao=request.user.administracao,
                     is_active=True
-                ).exclude(id=request.user.id)
+                )
                 group_name = f"departamento_{departamento_usuario.id}"
+
+            # Se for técnico, garante que a chefia recebe
+            if is_tecnico:
+                utilizadores = utilizadores_qs.filter(nivel_sigilo__gte=1)
+            else:
+                utilizadores = utilizadores_qs.exclude(id=request.user.id)
 
             if utilizadores.exists():
                 notificacoes = [
@@ -1131,25 +1153,38 @@ def encaminhar_documento(request, documento_id):
                             admin_destino_obj = movimentacao_atualizada.departamento_destino.administracao
 
                         if movimentacao_atualizada.seccao_destino:
-                            # Notifica APENAS usuários da SECÇÃO específica (FILTRO POR ADMINISTRAÇÃO DO DESTINO)
-                            utilizadores_a_notificar = CustomUser.objects.filter(
+                            utilizadores_qs = CustomUser.objects.filter(
                                 seccao=movimentacao_atualizada.seccao_destino,
                                 administracao=admin_destino_obj,
                                 is_active=True
                             )
                             destino_texto = f"secção {movimentacao_atualizada.seccao_destino.nome}"
                             group_name = f"seccao_{movimentacao_atualizada.seccao_destino.id}"
-
                         elif movimentacao_atualizada.departamento_destino:
-                            # Notifica TODOS os usuários do DEPARTAMENTO (FILTRO POR ADMINISTRAÇÃO DO DESTINO)
-                            utilizadores_a_notificar = CustomUser.objects.filter(
+                            utilizadores_qs = CustomUser.objects.filter(
                                 departamento=movimentacao_atualizada.departamento_destino,
                                 administracao=admin_destino_obj,
                                 is_active=True
                             )
                             destino_texto = f"departamento {movimentacao_atualizada.departamento_destino.nome}"
                             group_name = f"departamento_{movimentacao_atualizada.departamento_destino.id}"
+                        else:
+                            utilizadores_qs = None
+                            group_name = None
 
+                        # --- LÓGICA DE NOTIFICAÇÃO PARA CHEFIA ---
+                        if utilizadores_qs:
+                            is_tecnico = request.user.nivel_sigilo < 1
+                            mesmo_setor = False
+                            if movimentacao_atualizada.seccao_destino and request.user.seccao == movimentacao_atualizada.seccao_destino:
+                                mesmo_setor = True
+                            elif movimentacao_atualizada.departamento_destino and request.user.departamento == movimentacao_atualizada.departamento_destino:
+                                mesmo_setor = True
+                            
+                            if is_tecnico and mesmo_setor:
+                                utilizadores_a_notificar = utilizadores_qs.filter(nivel_sigilo__gte=1)
+                            else:
+                                utilizadores_a_notificar = utilizadores_qs.exclude(id=request.user.id)
                         else:
                             utilizadores_a_notificar = []
                             destino_texto = "destino não especificado"
