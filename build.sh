@@ -9,9 +9,9 @@ pip install -r requirements.txt
 # Coletar arquivos estáticos
 python manage.py collectstatic --no-input
 
-python manage.py makemigrations
-# Aplicar migrações do banco de dados
-python manage.py migrate
+# Sincronizar banco de dados
+# Removido makemigrations para evitar conflitos em produção
+python manage.py migrate --no-input
 
 # Arranque: gunicorn com uvicorn workers (definido no Procfile ou no Render dashboard)
 # gunicorn SGA.asgi:application --worker-class uvicorn.workers.UvicornWorker --workers 4 --bind 0.0.0.0:$PORT
