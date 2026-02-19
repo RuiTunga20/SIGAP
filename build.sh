@@ -10,8 +10,15 @@ pip install -r requirements.txt
 python manage.py collectstatic --no-input
 
 # Sincronizar banco de dados
-# Removido makemigrations para evitar conflitos em produção
-python manage.py migrate --no-input
+if [ "$RESET_DB" == "1" ]; then
+    echo "⚠️ HARD RESET: Apagando e recriando esquema público..."
+    # Comando para limpar o banco (Postgres)
+    python manage.py dbshell -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
+    python manage.py migrate --no-input
+else
+    # Sincronização normal
+    python manage.py migrate --no-input
+fi
 
 # Arranque: gunicorn com uvicorn workers (definido no Procfile ou no Render dashboard)
 # gunicorn SGA.asgi:application --worker-class uvicorn.workers.UvicornWorker --workers 4 --bind 0.0.0.0:$PORT
