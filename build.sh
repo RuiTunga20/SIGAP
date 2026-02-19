@@ -12,8 +12,8 @@ python manage.py collectstatic --no-input
 # Sincronizar banco de dados
 if [ "$RESET_DB" == "1" ]; then
     echo "⚠️ HARD RESET: Apagando e recriando esquema público..."
-    # Comando para limpar o banco (Postgres)
-    python manage.py dbshell -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
+    # Comando para limpar o banco (Postgres) - Corrigido para usar pipe
+    echo "DROP SCHEMA public CASCADE; CREATE SCHEMA public;" | python manage.py dbshell
     python manage.py migrate --no-input
 else
     # Sincronização normal
