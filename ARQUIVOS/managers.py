@@ -45,18 +45,25 @@ class DocumentoManager(SoftDeleteManager):
         # Se for Chefia/Direção (Nivel >= 1), vê tudo do seu setor + Histórico
         # (Mantém lógica original de setor, mas agora restrita a chefes)
 
-        # 2. Usuário de Secção (Chefia)
+        # 2. Usuário de Secção (Chefia Nível 1 e Técnicos)
         if hasattr(user, 'seccao') and user.seccao:
+            # ISOLAMENTO ESTRITO:
+            # Vê APENAS documentos que estão fisicamente na secção (seccao_atual = secção)
+            # OU documentos que foram enviados para a secção (movimentacao destino = secção)
+            # Documentos do departamento pai (sem secção) NÃO são visíveis.
+            
             return qs.filter(
                 Q(seccao_atual=user.seccao) |
-                Q(movimentacoes__seccao_origem=user.seccao) |
                 Q(movimentacoes__seccao_destino=user.seccao)
             ).distinct()
 
-        # 3. Usuário de Departamento (Direção)
+        # 3. Usuário de Departamento (Direção Nível 2)
         if hasattr(user, 'departamento') and user.departamento:
+            # ISOLAMENTO: Diretor vê documentos no nível do departamento (seccao_atual IS NULL)
+            # Se o documento entrar em uma secção, o Diretor "perde" a visão direta (isolamento)
+            # a menos que ele tenha participado do histórico.
             return qs.filter(
-                Q(departamento_atual=user.departamento) |
+                Q(departamento_atual=user.departamento, seccao_atual__isnull=True) |
                 Q(movimentacoes__departamento_origem=user.departamento) |
                 Q(movimentacoes__departamento_destino=user.departamento)
             ).distinct()

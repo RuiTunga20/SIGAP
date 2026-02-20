@@ -150,8 +150,11 @@ def dashboard(request):
         ]
     ).count()
 
+    # Definir nome de exibição no dashboard (Secção ou Departamento)
+    nome_exibicao = seccao_usuario.nome if seccao_usuario else departamento_usuario.nome
+
     context = {
-        'departamento_nome': departamento_usuario.nome,
+        'departamento_nome': nome_exibicao, # Agora exibe o nome da Secção se existir
         'seccao_nome': seccao_usuario.nome if seccao_usuario else None,
         'documentos_pendentes': documentos_pendentes,
         'documentos_encaminhados_hoje': documentos_encaminhados_hoje,
@@ -387,6 +390,12 @@ def detalhe_documento(request, documento_id):
         id=documento_id
     )
 
+    # RESTRIÇÃO: Técnicos só acedem à página detalhe de documentos atribuídos ou criados por eles
+    if getattr(request.user, 'eh_tecnico', False):
+        if documento.responsavel_atual != request.user and documento.criado_por != request.user:
+            from django.http import HttpResponseForbidden
+            return HttpResponseForbidden("Não tem permissão para aceder a este documento.")
+
     # Limpar notificações pendentes deste documento para este usuário
     Notificacao.objects.filter(
         usuario=request.user,
@@ -417,13 +426,43 @@ def detalhe_documento(request, documento_id):
         
         # Caso 1: Usuário está em uma SECÇÃO
         if user_seccao:
+            # ISOLAMENTO ESTRITO: Chefe só mexe no que é DA SECÇÃO.
+            # Não pode puxar de departamento.
+            # Se for TÉCNICO, ele vê o documento mas não o formulário de encaminhamento geral (tratado no template/form).
             pode_encaminhar = (documento.seccao_atual == user_seccao)
+            
+            # RESTRIÇÃO:
+            # - Chefia: tramitação bloqueada APENAS se já DISTRIBUIU a um técnico
+            #   (responsavel_atual é um técnico diferente do chefe).
+            #   Se responsavel_atual é o criador ou o próprio chefe, tramitação fica disponível.
+            # - Técnicos: bloqueados se o responsável é outro técnico.
+            is_chefia = request.user.nivel_sigilo >= 1
+            if documento.responsavel_atual and documento.responsavel_atual != request.user:
+                if is_chefia:
+                    # Chefia: bloqueia APENAS se o responsável é um técnico (distribuição explícita)
+                    resp = documento.responsavel_atual
+                    if getattr(resp, 'nivel_sigilo', 0) < 1 and resp != documento.criado_por:
+                        pode_encaminhar = False
+                else:
+                    # Técnico: bloqueia se o responsável é outro
+                    pode_encaminhar = False
+                
         # Caso 2: Usuário está DIRETO no DEPARTAMENTO (sem secção)
         elif user_departamento:
             pode_encaminhar = (
                     documento.departamento_atual == user_departamento and
                     documento.seccao_atual is None
             )
+            
+            # RESTRIÇÃO: Mesma lógica para Diretores
+            is_chefia = request.user.nivel_sigilo >= 1
+            if documento.responsavel_atual and documento.responsavel_atual != request.user:
+                if is_chefia:
+                    resp = documento.responsavel_atual
+                    if getattr(resp, 'nivel_sigilo', 0) < 1 and resp != documento.criado_por:
+                        pode_encaminhar = False
+                else:
+                    pode_encaminhar = False
 
 
     # VERIFICAR SE É GESTOR (para despacho, aprovar, reprovar)
@@ -433,10 +472,26 @@ def detalhe_documento(request, documento_id):
     is_tecnico = request.user.nivel_sigilo < 1
     
     # Buscar todas as movimentações para o histórico (Pareceres e Observações)
-    # Técnicos vêem apenas movimentações entre departamentos (sem secção envolvida)
+    # Lógica de Visibilidade:
+    # 1. Técnicos vêm apenas movimentações de/para departamentos (públicas)
+    # 2. Chefes de Secção veem tudo do seu departamento (incluindo notas de técnicos)
+    # 3. Diretores veem despachos de chefes e movimentos entre depto (filtramos ruído interno)
+    
     observacoes_qs = MovimentacaoDocumento.objects.filter(documento=documento)
+    
     if is_tecnico:
         observacoes_qs = observacoes_qs.filter(seccao_destino__isnull=True, seccao_origem__isnull=True)
+    elif request.user.nivel_sigilo == 2: # Diretor de Departamento
+        # Diretores veem o fluxo estratégico.
+        # Ocultamos movimentações internas de técnicos (nível 0) para focar nos pareceres dos chefes.
+        observacoes_qs = observacoes_qs.exclude(
+            usuario__nivel_sigilo=0
+        ).filter(
+            Q(observacoes__isnull=False) | 
+            Q(tipo_movimentacao__in=['despacho', 'aprovado', 'reprovado']) |
+            Q(seccao_destino__isnull=True)
+        )
+        
     observacoes = observacoes_qs.order_by('-data_movimentacao')
 
     # Buscar movimentações detalhadas (Fluxo de Tramitação)
@@ -459,16 +514,31 @@ def detalhe_documento(request, documento_id):
         Q(seccao_destino=user_seccao) if user_seccao else Q(departamento_destino=user_departamento)
     )
 
-    # Instanciar formulários iniciais (GET)
-    encaminhar_form = EncaminharDocumentoForm(user=request.user, documento=documento)
-    despacho_form = DespachoForm()
+    # --- INICIALIZAÇÃO DE FORMULÁRIOS (COM PREFIXOS PARA EVITAR COLISÃO DE IDs) ---
+    encaminhar_form = EncaminharDocumentoForm(user=request.user, documento=documento, prefix='enc')
+    despacho_form = DespachoForm(prefix='desp')
     
     # Lógica de Distribuição (Chefia -> Técnico)
     pode_distribuir = False
     distribuir_form = None
-    if getattr(request.user, 'pode_distribuir', lambda: False)() and pode_encaminhar:
-        pode_distribuir = True
-        distribuir_form = DistribuirDocumentoForm(user=request.user)
+    
+    # Verificação robusta de permissão de distribuição
+    tem_permissao_distribuir = getattr(request.user, 'pode_distribuir', lambda: False)()
+    
+    if tem_permissao_distribuir:
+        # Cenário 1: Chefe de Secção
+        if user_seccao:
+            # Pode distribuir se o documento está NA SECÇÃO
+            if documento.seccao_atual == user_seccao:
+                pode_distribuir = True
+        
+        # Cenário 2: Diretor de Departamento
+        elif user_departamento:
+             if documento.departamento_atual == user_departamento and documento.seccao_atual is None:
+                pode_distribuir = True
+
+    if pode_distribuir:
+        distribuir_form = DistribuirDocumentoForm(user=request.user, prefix='dist')
 
     # --- INÍCIO DO TRATAMENTO POST ---
     if request.method == 'POST':
@@ -480,7 +550,7 @@ def detalhe_documento(request, documento_id):
                  messages.error(request, 'Sem permissão para distribuir.')
                  return redirect('detalhe_documento', documento_id=documento.id)
             
-            distribuir_form = DistribuirDocumentoForm(request.POST, user=request.user)
+            distribuir_form = DistribuirDocumentoForm(request.POST, user=request.user, prefix='dist')
             if distribuir_form.is_valid():
                 tecnico = distribuir_form.cleaned_data['tecnico']
                 obs = distribuir_form.cleaned_data['observacoes']
@@ -521,7 +591,8 @@ def detalhe_documento(request, documento_id):
             encaminhar_form = EncaminharDocumentoForm(
                 request.POST,
                 user=request.user,
-                documento=documento
+                documento=documento,
+                prefix='enc'
             )
 
             if encaminhar_form.is_valid():
@@ -614,7 +685,12 @@ def detalhe_documento(request, documento_id):
                         elif movimentacao.departamento_destino:
                             # Foi enviado para um DEPARTAMENTO GERAL
                             documento.seccao_atual = None
+                            documento.seccao_atual = None
                             documento.departamento_atual = movimentacao.departamento_destino
+
+                        # LIMPEZA DE RESPONSÁVEL:
+                        # Se foi encaminhado para fora, o técnico/chefe atual deixa de ser responsável direto.
+                        documento.responsavel_atual = None
 
                         documento.save()
 
@@ -697,7 +773,7 @@ def detalhe_documento(request, documento_id):
                 messages.error(request, 'Apenas administradores podem adicionar despacho.')
                 return redirect('detalhe_documento', documento_id=documento.id)
 
-            despacho_form = DespachoForm(request.POST)
+            despacho_form = DespachoForm(request.POST, prefix='desp')
             if despacho_form.is_valid():
                 # Cria movimentação de despacho
                 MovimentacaoDocumento.objects.create(
@@ -884,7 +960,14 @@ def criar_documento(request):
 
             # Atribuir ao documento
             documento.departamento_origem = departamento_usuario
-            documento.departamento_atual = departamento_usuario
+            documento.departamento_atual = departamento_usuario # Será o pai da secção se houver secção
+            
+            # CORREÇÃO CRÍTICA: Definir secção atual se o usuário estiver em uma
+            if seccao_usuario:
+                documento.seccao_atual = seccao_usuario
+                # O responsável atual pode ser mantido como o criador (técnico) por enquanto,
+                # ou atribuído ao chefe da secção. Vamos manter o criador para que ele veja "Na Posse".
+            
             documento.responsavel_atual = request.user
             
             # ATRIBUIÇÃO CRÍTICA DE ADMINISTRAÇÃO
@@ -947,6 +1030,15 @@ def criar_documento(request):
                 send_notification_sync(group_name, mensagem_ws, link_documento)
 
             messages.success(request, f'Documento {documento.numero_protocolo} criado com sucesso!')
+            
+            # SE usuario tem secção, o documento já está na secção (doc.seccao_atual).
+            # Não precisa ir para "Encaminhar" (onde selecionaria a própria secção).
+            if seccao_usuario:
+                 if request.user.nivel_sigilo < 1:
+                     # Técnico: volta ao dashboard (não precisa tramitar)
+                     return redirect('Painel')
+                 return redirect('detalhe_documento', documento_id=documento.id)
+            
             return redirect('Encaminhar', documento_id=mv.id)
     else:
         form = DocumentoForm()
@@ -1599,8 +1691,18 @@ def busca_ajax(request):
 def load_departamentos(request):
     """
     Retorna os departamentos de uma determinada administração (AJAX).
+    AGORA COM SEGURANÇA: Filtra pela administração do usuário se ele não for admin geral.
     """
     administracao_id = request.GET.get('administracao')
+    
+    # Se o usuário não for superuser ou admin de sistema, FORÇAR a administração dele
+    if not request.user.is_superuser and request.user.nivel_acesso != 'admin_sistema':
+        if request.user.administracao:
+            administracao_id = request.user.administracao.id
+        else:
+             # Usuário sem administração não vê nada
+            return render(request, 'ARQUIVOS/hr/dropdown_list_options.html', {'obj_list': Departamento.objects.none()})
+
     if administracao_id:
         departamentos = Departamento.objects.filter(administracao_id=administracao_id, ativo=True).order_by('nome')
     else:
@@ -1816,6 +1918,79 @@ def gestao_usuarios(request):
     }
     
     return render(request, 'gestao_usuarios.html', context)
+
+
+@login_required
+def editar_usuario(request, usuario_id):
+    """
+    View para admin_sistema editar usuário da sua administração.
+    Retorna o form em HTML se for AJAX, ou redireciona.
+    """
+    if request.user.nivel_acesso != 'admin_sistema':
+        messages.error(request, 'Permissão negada.')
+        return redirect('Painel')
+        
+    usuario = get_object_or_404(CustomUser, id=usuario_id)
+    
+    # Validar se usuário pertence à mesma administração
+    if usuario.administracao != request.user.administracao:
+        messages.error(request, 'Você não pode editar usuários de outra administração.')
+        return redirect('gestao_usuarios')
+        
+    if request.method == 'POST':
+        # Passar admin_user para filtrar querysets corretamente
+        form = EditarUsuarioAdminForm(request.POST, instance=usuario, admin_user=request.user)
+        if form.is_valid():
+            form.save()
+            messages.success(request, f'Usuário "{usuario.username}" atualizado com sucesso!')
+            return redirect('gestao_usuarios')
+        else:
+             # Se for submit normal e der erro
+             messages.error(request, 'Erro ao atualizar usuário. Verifique os dados.')
+             return redirect('gestao_usuarios')
+             
+    # GET: Retornar dados para modal (se for AJAX) ou página (se houver)
+    # Por enquanto, assumimos que será carregado via AJAX no modal
+    form = EditarUsuarioAdminForm(instance=usuario, admin_user=request.user)
+    
+    # Renderizar apenas o formulário (partial)
+    return render(request, 'partials/form_editar_usuario.html', {'form': form, 'usuario': usuario})
+
+
+@login_required
+def excluir_usuario(request, usuario_id):
+    """
+    View para admin_sistema DESATIVAR usuário.
+    Não exclui fisicamente para manter integridade.
+    """
+    if request.user.nivel_acesso != 'admin_sistema':
+        messages.error(request, 'Permissão negada.')
+        return redirect('Painel')
+        
+    usuario = get_object_or_404(CustomUser, id=usuario_id)
+    
+    if usuario.administracao != request.user.administracao:
+        messages.error(request, 'Você não pode alterar usuários de outra administração.')
+        return redirect('gestao_usuarios')
+        
+    if usuario == request.user:
+        messages.error(request, 'Você não pode desativar sua própria conta.')
+        return redirect('gestao_usuarios')
+        
+    # Toggle de status
+    if usuario.is_active:
+        usuario.is_active = False
+        msg = f'Usuário "{usuario.username}" foi desativado.'
+        importancia = messages.WARNING
+    else:
+        usuario.is_active = True
+        msg = f'Usuário "{usuario.username}" foi reativado.'
+        importancia = messages.SUCCESS
+        
+    usuario.save()
+    messages.add_message(request, importancia, msg)
+    
+    return redirect('gestao_usuarios')
 
 
 @login_required

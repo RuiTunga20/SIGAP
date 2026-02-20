@@ -64,6 +64,8 @@ path('notificacoes/marcar-como-lidas/', views.marcar_notificacoes_como_lidas, na
 
     # Gestão de Usuários (admin_sistema)
     path('administracao/usuarios/', views.gestao_usuarios, name='gestao_usuarios'),
+    path('administracao/usuarios/editar/<int:usuario_id>/', views.editar_usuario, name='editar_usuario'),
+    path('administracao/usuarios/excluir/<int:usuario_id>/', views.excluir_usuario, name='excluir_usuario'),
     path('ajax/seccoes-departamento/', views.ajax_seccoes_departamento, name='ajax_seccoes_departamento'),
 
 ]

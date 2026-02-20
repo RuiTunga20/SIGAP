@@ -143,11 +143,11 @@ class CustomUserAdmin(AdminMultiTenantMixin, UserAdmin):
     list_filter = ('nivel_acesso', 'is_staff', 'is_superuser', 'departamento', 'administracao')
     fieldsets = UserAdmin.fieldsets + (
         ('Hierarquia', {'fields': ('departamento', 'seccao', 'administracao')}),
-        ('Outros', {'fields': ('nivel_acesso', 'telefone')}),
+        ('Outros', {'fields': ('nivel_acesso', 'nivel_sigilo', 'telefone')}),
     )
     add_fieldsets = UserAdmin.add_fieldsets + (
         ('Hierarquia', {'fields': ('departamento', 'seccao', 'administracao')}),
-        ('Outros', {'fields': ('nivel_acesso', 'telefone')}),
+        ('Outros', {'fields': ('nivel_acesso', 'nivel_sigilo', 'telefone')}),
     )
     search_fields = ('username', 'email', 'first_name', 'last_name')
     ordering = ('username',)

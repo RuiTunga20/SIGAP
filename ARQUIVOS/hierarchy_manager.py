@@ -303,17 +303,20 @@ def _calcular_destinos_permitidos(user, ctx=None, incluir_self=True):
         # -----------------------------------------------------------------
         # CENÁRIO A: Usuário em Secção (CORRIGIDO!)
         # 
-        # NOVO COMPORTAMENTO:
-        # - Dept disponível: AGORA INCLUI O DEPARTAMENTO PAI!
-        # - Secções disponíveis: todas do mesmo dept, exceto a própria
-        # - Secções são DINÂMICAS (mas dept é único, então na prática fixas)
-        #
-        # MOTIVO: Secção precisa comunicar com seu departamento pai
-        # SEGURANÇA: Ainda é validado que é o dept pai da secção
+        # COMPORTAMENTO:
+        # - Dept disponível: Se for CHEFE (nivel_sigilo >= 1), vê todos os departamentos da base.
+        #                  Se for TÉCNICO, vê apenas o departamento pai (já tratado acima, mas mantemos segurança).
+        # - Secções disponíveis: todas do mesmo dept, exceto a própria.
         # -----------------------------------------------------------------
         
-        # ✅ CORREÇÃO: Incluir SEMPRE o departamento pai
-        qs_dept_final = qs_dept_base.filter(pk=dept.pk) if dept else Departamento.objects.none()
+        if getattr(user, 'nivel_sigilo', 0) >= 2:
+            # Directores/Alta Gestão: veem todos os departamentos
+            qs_dept_final = qs_dept_base.order_by('nome')
+        elif getattr(user, 'nivel_sigilo', 0) == 1:
+            # Chefes de Secção: veem APENAS o departamento pai (+ secções irmãs via qs_sec)
+            qs_dept_final = Departamento.objects.filter(pk=dept.pk).order_by('nome') if dept else Departamento.objects.none()
+        else:
+            qs_dept_final = Departamento.objects.filter(pk=dept.pk) if dept else Departamento.objects.none()
         
         qs_sec_final = Seccoes.objects.filter(
             departamento=dept,

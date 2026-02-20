@@ -9,6 +9,7 @@
     <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
     {{ encaminhar_form.media }}
     {{ despacho_form.media }}
+    {{ distribuir_form.media }}
 </head>
 <body class="h-full">
     {% include "menu.html" %}
@@ -121,8 +122,27 @@
                         <h3 class="text-xs font-black uppercase tracking-widest text-slate-500">Pareceres e Observações Técnicas</h3>
                     </div>
                     <div class="divide-y divide-slate-50">
+                        {% if documento.observacoes %}
+                            <div class="p-6 flex gap-4 bg-red-50/30">
+                                <div class="w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center flex-shrink-0">
+                                    <i data-lucide="info" class="w-5 h-5 text-sga-red"></i>
+                                </div>
+                                <div class="flex-1">
+                                    <div class="flex items-center justify-between mb-2">
+                                        <span class="text-sm font-bold text-slate-800">Parecer Inicial de Cadastro</span>
+                                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-tight">
+                                            {{ documento.criado_por.get_full_name|default:documento.criado_por.username }}
+                                        </span>
+                                    </div>
+                                    <p class="text-sm text-slate-600 leading-relaxed italic">
+                                        "{{ documento.observacoes|safe }}"
+                                    </p>
+                                </div>
+                            </div>
+                        {% endif %}
+
                         {% for obs in observacoes %}
-                            {% if obs.observacoes %}
+                            {% if obs.observacoes or obs.despacho %}
                                 <div class="p-6 flex gap-4">
                                     <div class="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center flex-shrink-0">
                                         <i data-lucide="quote" class="w-5 h-5 text-slate-300"></i>
@@ -131,32 +151,41 @@
                                         <div class="flex items-center justify-between mb-2">
                                             <span class="text-sm font-bold text-slate-800">{{ obs.usuario.get_full_name|default:obs.usuario.username }}</span>
                                             <span class="text-[10px] font-bold text-slate-400 uppercase tracking-tight">
-                                                {% if obs.usuario.departamento %}
-                                                    {{ obs.usuario.departamento.nome }}
-                                                    {% if obs.usuario.administracao != user.administracao %}
-                                                        - {{ obs.usuario.administracao.nome }}
-                                                    {% endif %}
-                                                {% elif obs.usuario.seccao %}
+                                                {{ obs.get_tipo_movimentacao_display }} -
+                                                {% if obs.usuario.seccao %}
                                                     {{ obs.usuario.seccao.nome }}
-                                                    {% if obs.usuario.seccao.departamento.administracao != user.administracao %}
-                                                        - {{ obs.usuario.seccao.departamento.administracao.nome }}
-                                                    {% endif %}
+                                                {% elif obs.usuario.departamento %}
+                                                    {{ obs.usuario.departamento.nome }}
                                                 {% else %}
                                                     Acesso Externo / Sistema
                                                 {% endif %}
                                             </span>
                                         </div>
-                                        <p class="text-sm text-slate-600 leading-relaxed italic">
-                                            "{{ obs.observacoes|safe }}"
-                                        </p>
+                                        
+                                        {% if obs.observacoes %}
+                                            <p class="text-sm text-slate-600 leading-relaxed italic mb-2">
+                                                "{{ obs.observacoes|safe }}"
+                                            </p>
+                                        {% endif %}
+                                        
+                                        {% if obs.despacho %}
+                                            <div class="mt-2 p-3 bg-slate-50 rounded-lg border-l-4 border-slate-200">
+                                                <span class="text-[10px] font-bold text-slate-400 uppercase block mb-1">Despacho:</span>
+                                                <div class="text-sm text-slate-700">
+                                                    {{ obs.despacho|safe }}
+                                                </div>
+                                            </div>
+                                        {% endif %}
                                     </div>
                                 </div>
                             {% endif %}
                         {% empty %}
-                            <div class="p-12 text-center">
-                                <i data-lucide="message-circle-off" class="w-10 h-10 text-slate-100 mx-auto mb-3"></i>
-                                <p class="text-xs text-slate-400 font-medium">Nenhum parecer registrado até o momento.</p>
-                            </div>
+                            {% if not documento.observacoes %}
+                                <div class="p-12 text-center">
+                                    <i data-lucide="message-circle-off" class="w-10 h-10 text-slate-100 mx-auto mb-3"></i>
+                                    <p class="text-xs text-slate-400 font-medium">Nenhum parecer registrado até o momento.</p>
+                                </div>
+                            {% endif %}
                         {% endfor %}
                     </div>
                 </div>
@@ -486,10 +515,10 @@
             });
 
             // Lógica de Independência de Selects (Select2 integrada)
-            const $hierSelect = $('select[name="destino_hierarquico"]');
-            const $deptSelect = $('select[name="departamento_destino"]');
-            const $seccaoSelect = $('select[name="seccao_destino"]');
-            const $muniSelect = $('select[name="destino_municipal"]');
+            const $hierSelect = $('select[name="enc-destino_hierarquico"]');
+            const $deptSelect = $('select[name="enc-departamento_destino"]');
+            const $seccaoSelect = $('select[name="enc-seccao_destino"]');
+            const $muniSelect = $('select[name="enc-destino_municipal"]');
 
             function handleExclusivity() {
                 const hierVal = $hierSelect.val();

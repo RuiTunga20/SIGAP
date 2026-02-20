@@ -50,8 +50,8 @@ class MovimentacaoDocumento(models.Model):
     usuario = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
     data_movimentacao = models.DateTimeField(auto_now_add=True)
 
-    observacoes = models.TextField(blank=True)
-    despacho = models.TextField(blank=True)
+    observacoes = HTMLField(blank=True,null=True)
+    despacho = HTMLField(blank=True,null=True)
 
     confirmado_recebimento = models.BooleanField(default=False)
     data_confirmacao = models.DateTimeField(null=True, blank=True)

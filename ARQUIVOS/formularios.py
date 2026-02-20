@@ -48,8 +48,8 @@ class DocumentoForm(forms.ModelForm):
     class Meta:
         model = Documento
         fields = [
-            'titulo', 'conteudo', 'tipo_documento', 'prioridade',
-            'arquivo', 'arquivo_digitalizado', 'tags', 'observacoes',
+            'titulo', 'tipo_documento', 'prioridade',
+            'arquivo', 'arquivo_digitalizado', 'tags',
             'utente', 'telefone', 'email', 'origem', 'niveis', 'referencia',
         ]
         widgets = {
@@ -74,12 +74,6 @@ class DocumentoForm(forms.ModelForm):
             'tipo_documento': forms.Select(attrs={'class': 'form-select'}),
             'prioridade': forms.Select(attrs={
                 'class': 'form-select',
-                'choices': [
-                    ('baixa', '🟢 Baixa'),
-                    ('normal', '🟡 Normal'),
-                    ('alta', '🟠 Alta'),
-                    ('urgente', '🔴 Urgente')
-                ]
             }),
             'arquivo': forms.FileInput(attrs={
                 'class': 'file-input',
@@ -119,10 +113,15 @@ class EncaminharDocumentoForm(forms.ModelForm):
             'despacho',
         ]
         widgets = {
-            'observacoes': forms.Textarea(attrs={
-                'rows': 3,
+            'observacoes': TinyMCE(attrs={
+                'rows': 5,
                 'class': 'form-control',
                 'placeholder': 'Observações sobre o encaminhamento...',
+            }),
+            'despacho': TinyMCE(attrs={
+                'rows': 5,
+                'class': 'form-control',
+                'placeholder': 'Despacho oficial...',
             }),
             'tipo_movimentacao': forms.Select(attrs={'class': 'form-control'}),
             'departamento_destino': forms.Select(attrs={
@@ -177,11 +176,38 @@ class EncaminharDocumentoForm(forms.ModelForm):
             
             # Obter destinos
             self.show_external = manager.usuario_pode_encaminhar_externo()
-            qs_hierarquico = manager.obter_destinos_hierarquicos()
-            qs_dept_permitidos, qs_sec, seccoes_fixas = manager.obter_destinos_permitidos(incluir_self=False)
+            # Filtro de Técnicos de Secção (Nível 0)
+            # Regra: Técnico não encaminha para fora. Só DEVOLVE à chefia da sua secção.
+            if getattr(self.user, 'eh_tecnico', False) and getattr(self.user, 'seccao', None):
+                # Técnico de Secção: vê APENAS a própria secção (para devolver à chefia).
+                # Não vê departamentos nem destinos externos.
+                qs_hierarquico = Administracao.objects.none()
+                qs_dept_permitidos = Departamento.objects.none()
+                qs_sec = Seccoes.objects.filter(pk=self.user.seccao.pk)
+                seccoes_fixas = True
+            else:
+                qs_hierarquico = manager.obter_destinos_hierarquicos()
+                qs_dept_permitidos, qs_sec, seccoes_fixas = manager.obter_destinos_permitidos(incluir_self=False)
             
             # Filtrar departamentos para serem apenas INTERNOS (mesma administração)
             qs_dept_interno = qs_dept_permitidos.filter(administracao=self.user.administracao)
+            
+            # Verificar se é Secretaria Geral de um Governo
+            # CORREÇÃO: Evitar erro "Cannot combine a unique query with a non-unique query"
+            # O `qs_dept_permitidos` pode vir com distinct(), então o operador | falha.
+            # Convertemos para lista de IDs para garantir segurança.
+            ids_permitidos = list(qs_dept_interno.values_list('pk', flat=True))
+            
+            # CORREÇÃO PARA CHEFES DE SECÇÃO (Nível 1):
+            if getattr(self.user, 'nivel_sigilo', 0) >= 1 and getattr(self.user, 'seccao', None):
+                dept_pai = self.user.seccao.departamento
+                if dept_pai and dept_pai.pk not in ids_permitidos:
+                     ids_permitidos.append(dept_pai.pk)
+            
+            # Recriar queryset limpo
+            qs_dept_interno = Departamento.objects.filter(pk__in=ids_permitidos)
+            
+            qs_dept_interno = qs_dept_interno.distinct().order_by('nome')
             
             # Verificar se é Secretaria Geral de um Governo
             from .hierarchy_manager import _is_secretaria_geral
@@ -907,6 +933,148 @@ class ArmazenamentoDocumentoForm(forms.ModelForm):
 
         return cleaned_data
 
+
+# ===========================================================================
+# EditarUsuarioAdminForm (NOVO para Edição)
+# ===========================================================================
+
+class EditarUsuarioAdminForm(forms.ModelForm):
+    """
+    Formulário para editar usuários existentes.
+    Permite alterar nome, email, departamento, secção e nível de acesso.
+    Não permite alterar senha aqui (usar fluxo de reset ou outro form se necessário).
+    """
+    
+    email = forms.EmailField(
+        widget=forms.EmailInput(attrs={'class': 'form-control'}),
+        required=True
+    )
+    
+    first_name = forms.CharField(
+        widget=forms.TextInput(attrs={'class': 'form-control'}),
+        required=True,
+        label='Nome'
+    )
+
+    last_name = forms.CharField(
+        widget=forms.TextInput(attrs={'class': 'form-control'}),
+        required=True,
+        label='Sobrenome'
+    )
+    
+    telefone = forms.CharField(
+        widget=forms.TextInput(attrs={'class': 'form-control'}),
+        required=False
+    )
+    
+    departamento = forms.ModelChoiceField(
+        queryset=Departamento.objects.none(),
+        widget=forms.Select(attrs={'class': 'form-select', 'id': 'id_departamento_edit'}),
+        required=True,
+        label='Departamento'
+    )
+
+    seccao = forms.ModelChoiceField(
+        queryset=Seccoes.objects.none(),
+        widget=forms.Select(attrs={'class': 'form-select', 'id': 'id_seccao_edit'}),
+        required=False,
+        label='Secção (Opcional)'
+    )
+
+    nivel_acesso = forms.ChoiceField(
+        choices=CustomUser.NIVEL_CHOICES,
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        required=True,
+        label='Nível de Acesso'
+    )
+    
+    is_active = forms.BooleanField(
+        required=False, 
+        label='Usuário Ativo',
+        widget=forms.CheckboxInput(attrs={'class': 'form-check-input'})
+    )
+
+    class Meta:
+        model = CustomUser
+        fields = (
+            'email', 'first_name', 'last_name', 'telefone', 
+            'departamento', 'seccao', 'nivel_acesso', 'is_active'
+        )
+
+    def __init__(self, *args, **kwargs):
+        self.admin_user = kwargs.pop('admin_user', None)
+        super().__init__(*args, **kwargs)
+        
+        # 1. Filtrar Departamento pela Administração do Admin Logado
+        if self.admin_user and self.admin_user.administracao:
+            admin_user_admin = self.admin_user.administracao
+            
+            # Popular Depto Queryset
+            self.fields['departamento'].queryset = (
+                Departamento.objects.filter(
+                    administracao=admin_user_admin
+                )
+                .order_by('nome')
+            )
+            
+            # Popular Nivel Acesso Choices
+            tipo = admin_user_admin.tipo_municipio
+            self.fields['nivel_acesso'].choices = CustomUser.niveis_para_tipo(tipo)
+        else:
+             self.fields['departamento'].queryset = Departamento.objects.none()
+
+        # 2. Filtrar Secção (Lógica de Dependência)
+        dept_id = None
+        
+        # Tenta pegar do POST (bind)
+        if self.data and 'departamento' in self.data:
+            try:
+                dept_id = int(self.data.get('departamento'))
+            except (ValueError, TypeError):
+                pass
+        # Se não tem POST, pega da instância (initial)
+        elif self.instance.pk and self.instance.departamento:
+            dept_id = self.instance.departamento.id
+            
+            # Caso especial: Se usuário tem secção e departamento, o campo departamento no form
+            # pode vir vazio na limpeza (clean), mas na inicialização queremos ver o departamento pai
+            if not dept_id and self.instance.seccao and self.instance.seccao.departamento:
+                 dept_id = self.instance.seccao.departamento.id
+                 self.initial['departamento'] = dept_id
+
+        # Popular Queryset de Secção
+        if dept_id:
+             try:
+                self.fields['seccao'].queryset = (
+                    Seccoes.objects.filter(
+                        departamento_id=dept_id,
+                        # Garante isolamento: Secção deve ser da mesma administração
+                        departamento__administracao=self.admin_user.administracao if self.admin_user else None
+                    )
+                    .order_by('nome')
+                )
+             except (AttributeError, ValueError):
+                self.fields['seccao'].queryset = Seccoes.objects.none()
+        else:
+             self.fields['seccao'].queryset = Seccoes.objects.none()
+
+    def clean(self):
+        cleaned_data = super().clean()
+        departamento = cleaned_data.get('departamento')
+        seccao = cleaned_data.get('seccao')
+
+        # Se Secção for selecionada, ela define o departamento "real" (propriedade do modelo)
+        # O campo departamento pode ser ignorado ou setado para None dependendo da lógica do seu model.
+        # SE seu model permite departamento=None quando tem seccao:
+        if seccao:
+            cleaned_data['departamento'] = None
+        
+        # Se NÃO tiver secção, Departamento é obrigatório
+        if not seccao and not departamento:
+             self.add_error('departamento', 'Selecione um departamento ou uma secção.')
+        
+        return cleaned_data
+
 class DistribuirDocumentoForm(forms.Form):
     """Formulário para chefia distribuir documento a um técnico."""
     
@@ -938,7 +1106,9 @@ class DistribuirDocumentoForm(forms.Form):
             if seccao:
                 qs = qs.filter(seccao=seccao)
             elif dept:
-                qs = qs.filter(departamento=dept)
+                # Inclui usuários DIRETOS do departamento OU usuários das SECÇÕES desse departamento
+                from django.db.models import Q
+                qs = qs.filter(Q(departamento=dept) | Q(seccao__departamento=dept))
                 
             self.fields['tecnico'].queryset = qs.order_by('first_name')
             self.fields['tecnico'].label_from_instance = lambda u: f"{u.get_full_name()} ({u.username})"

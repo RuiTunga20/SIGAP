@@ -209,6 +209,20 @@ class CustomUser(AbstractUser):
                 })
 
     def save(self, *args, **kwargs):
+        # Automação de Nível de Sigilo baseada no Nível de Acesso
+        # Garante que Chefes e Diretores tenham permissão de ver/distribuir documentos
+        if self.nivel_acesso in ['admin_sistema', 'ministro', 'governador', 'admin_municipal', 
+                                 'diretor_nacional', 'diretor_gabinete', 'diretor_municipal']:
+            self.nivel_sigilo = 2 # Direção / Alta Gestão
+        elif self.nivel_acesso in ['chefe_departamento', 'chefe_seccao', 'admin_adjunto']:
+            self.nivel_sigilo = 1 # Chefia
+        elif self.nivel_acesso == 'tecnico':
+             # Mantém 0, a menos que tenha sido alterado manualmente (permite override)
+             if self.nivel_sigilo > 0 and self.pk:
+                 pass # Se já tinha sigilo maior, respeita
+             else:
+                self.nivel_sigilo = 0
+
         self.full_clean()
         super().save(*args, **kwargs)
 

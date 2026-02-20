@@ -123,6 +123,7 @@
                                 <th class="px-8 py-4 text-[10px] font-black uppercase tracking-wider text-slate-400">Identificação</th>
                                 <th class="px-8 py-4 text-[10px] font-black uppercase tracking-wider text-slate-400">Localização</th>
                                 <th class="px-8 py-4 text-[10px] font-black uppercase tracking-wider text-slate-400 text-right">Permissões</th>
+                                <th class="px-8 py-4 text-[10px] font-black uppercase tracking-wider text-slate-400 text-right">Ações</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-50">
@@ -160,10 +161,31 @@
                                         {{ u.get_nivel_acesso_display|default:u.nivel_acesso }}
                                     </span>
                                 </td>
+                                <td class="px-8 py-6 text-right">
+                                    <div class="flex items-center justify-end gap-2">
+                                        <!-- Botão Editar -->
+                                        <button onclick="openEditModal('{{ u.id }}')" class="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all" title="Editar Utilizador">
+                                            <i data-lucide="pencil" class="w-4 h-4"></i>
+                                        </button>
+                                        
+                                        <!-- Botão Excluir/Desativar -->
+                                        {% if u.id != request.user.id %}
+                                            <a href="{% url 'excluir_usuario' u.id %}" onclick="return confirm('Tem certeza que deseja {% if u.is_active %}DESATIVAR{% else %}REATIVAR{% endif %} este usuário?');" 
+                                               class="p-2 {% if u.is_active %}text-slate-400 hover:text-red-600 hover:bg-red-50{% else %}text-red-400 hover:text-emerald-600 hover:bg-emerald-50{% endif %} rounded-lg transition-all" 
+                                               title="{% if u.is_active %}Desativar{% else %}Reativar{% endif %} Utilizador">
+                                               {% if u.is_active %}
+                                                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                               {% else %}
+                                                    <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+                                               {% endif %}
+                                            </a>
+                                        {% endif %}
+                                    </div>
+                                </td>
                             </tr>
                             {% empty %}
                             <tr>
-                                <td colspan="3" class="px-8 py-12 text-center">
+                                <td colspan="4" class="px-8 py-12 text-center">
                                     <i data-lucide="shield-alert" class="w-10 h-10 text-slate-100 mx-auto mb-3"></i>
                                     <p class="text-xs text-slate-400 font-medium">Nenhum utilizador registado nesta administração.</p>
                                 </td>
@@ -176,11 +198,107 @@
         </div>
     </main>
 
+    <!-- Modal de Edição -->
+    <div id="editModal" class="fixed inset-0 z-50 hidden" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+        <!-- Backdrop -->
+        <div class="fixed inset-0 bg-slate-900/20 backdrop-blur-sm transition-opacity opacity-0" id="modalBackdrop"></div>
+
+        <div class="fixed inset-0 z-10 w-screen overflow-y-auto">
+            <div class="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
+                <div class="relative transform overflow-hidden rounded-2xl bg-white text-left shadow-2xl transition-all sm:my-8 sm:w-full sm:max-w-xl opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95" id="modalPanel">
+                    
+                    <!-- Header Modal -->
+                    <div class="bg-slate-50 px-4 py-3 sm:px-6 border-b border-slate-100 flex justify-between items-center">
+                        <div class="flex items-center gap-2">
+                             <div class="p-2 bg-white rounded-lg border border-slate-100 shadow-sm">
+                                <i data-lucide="user-cog" class="w-5 h-5 text-sga-red"></i>
+                             </div>
+                             <h3 class="text-sm font-black uppercase tracking-wider text-slate-700" id="modal-title">Editar Utilizador</h3>
+                        </div>
+                        <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600 transition-colors">
+                            <i data-lucide="x" class="w-5 h-5"></i>
+                        </button>
+                    </div>
+
+                    <!-- Conteúdo do Form (Carregado via AJAX) -->
+                    <div class="px-4 py-5 sm:p-6" id="modalContent">
+                        <div class="flex justify-center py-8">
+                            <i data-lucide="loader-2" class="w-8 h-8 text-sga-red animate-spin"></i>
+                        </div>
+                    </div>
+                    
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
     
     <script>
+        // Funções do Modal
+        function openEditModal(userId) {
+            const modal = document.getElementById('editModal');
+            const backdrop = document.getElementById('modalBackdrop');
+            const panel = document.getElementById('modalPanel');
+            const content = document.getElementById('modalContent');
+            
+            // Mostrar modal
+            modal.classList.remove('hidden');
+            
+            // Animação de entrada
+            setTimeout(() => {
+                backdrop.classList.remove('opacity-0');
+                panel.classList.remove('opacity-0', 'translate-y-4', 'sm:translate-y-0', 'sm:scale-95');
+                panel.classList.add('opacity-100', 'translate-y-0', 'sm:scale-100');
+            }, 10);
+
+            // Carregar conteúdo via AJAX
+            content.innerHTML = '<div class="flex justify-center py-8"><i data-lucide="loader-2" class="w-8 h-8 text-sga-red animate-spin"></i></div>';
+            lucide.createIcons();
+            
+            fetch(`/administracao/usuarios/editar/${userId}/`)
+                .then(response => response.text())
+                .then(html => {
+                    content.innerHTML = html;
+                    // Re-inicializar ícones e scripts do partial
+                    if (window.lucide) lucide.createIcons();
+                    
+                    // Executar scripts dentro do HTML retornado (o fetch injecta HTML mas não executa script tags automaticamente em alguns browsers/contextos, 
+                    // mas como estamos usando jQuery no partial, vamos garantir)
+                    // O jQuery $(document).ready dentro do partial vai rodar se o script for executado.
+                    // Uma forma segura é extrair e rodar os scripts:
+                    const scripts = content.querySelectorAll("script");
+                    scripts.forEach(script => {
+                        const newScript = document.createElement("script");
+                        newScript.textContent = script.textContent;
+                        document.body.appendChild(newScript);
+                        document.body.removeChild(newScript);
+                    });
+                })
+                .catch(err => {
+                    content.innerHTML = '<p class="text-red-500 text-center font-bold">Erro ao carregar formulário.</p>';
+                    console.error(err);
+                });
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('editModal');
+            const backdrop = document.getElementById('modalBackdrop');
+            const panel = document.getElementById('modalPanel');
+            
+            // Animação de saída
+            backdrop.classList.add('opacity-0');
+            panel.classList.remove('opacity-100', 'translate-y-0', 'sm:scale-100');
+            panel.classList.add('opacity-0', 'translate-y-4', 'sm:translate-y-0', 'sm:scale-95');
+            
+            setTimeout(() => {
+                modal.classList.add('hidden');
+                document.getElementById('modalContent').innerHTML = ''; // Limpar
+            }, 300);
+        }
+
         document.addEventListener('DOMContentLoaded', function() {
             // Inicializar Lucide
             if (window.lucide) { lucide.createIcons(); }

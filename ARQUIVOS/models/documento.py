@@ -39,9 +39,11 @@ class Documento(SoftDeleteModel, AuditoriaModel):
     Modelo principal para documentos
     """
     PRIORIDADE_CHOICES = [
-        ('Normal', 'Normal 🟡'),
-        ('Urgente', 'Urgente 🔴'),
-        ('Muito Urgente', 'Muito Urgente 🔥'),
+        ('baixa', 'Baixa 🟢'),
+        ('normal', 'Normal 🟡'),
+        ('alta', 'Alta 🟠'),
+        ('urgente', 'Urgente 🔴'),
+        ('muito_urgente', 'Muito Urgente 🔥'),
     ]
     ORIGEM_CHOICES = [
         ('Pessoa Singular', 'Pessoa Singular'),
@@ -59,7 +61,7 @@ class Documento(SoftDeleteModel, AuditoriaModel):
 
     numero_protocolo = models.CharField(max_length=20, unique=True, editable=False)
     titulo = models.CharField('Assunto', max_length=200)
-    conteudo = models.TextField()
+    conteudo = models.TextField(blank=True, null=True)
     tipo_documento = models.ForeignKey(TipoDocumento, on_delete=models.PROTECT)
     arquivo = models.FileField(
         upload_to='documentos/%Y/%m/',
@@ -113,7 +115,8 @@ class Documento(SoftDeleteModel, AuditoriaModel):
     tags = models.CharField(max_length=500, blank=True, help_text="O numero do Armario pasta  Armario-1/doc-335")
     referencia = models.CharField(max_length=500, blank=True, help_text="referência")
 
-    observacoes = models.TextField(blank=True)
+    observacoes = models.TextField(blank=True, help_text="Conteúdo do documento", null=True)
+
 
     utente = models.CharField('Remetente', max_length=200, null=True, blank=True)
     telefone = models.CharField(max_length=9, validators=[RegexValidator(r'^\d{9}$', 'O telefone deve ter 9 dígitos.')], null=True, blank=True)
@@ -178,7 +181,7 @@ class Anexo(models.Model):
     documento = models.ForeignKey(Documento, on_delete=models.CASCADE, related_name='anexos')
     arquivo = models.FileField(upload_to='anexos/%Y/%m/')
     nome = models.CharField(max_length=200)
-    descricao = HTMLField(blank=True)
+    descricao = HTMLField(blank=True, null=True)
     usuario_upload = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
     data_upload = models.DateTimeField(auto_now_add=True)
 
