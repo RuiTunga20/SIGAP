@@ -390,11 +390,6 @@ def detalhe_documento(request, documento_id):
         id=documento_id
     )
 
-    # RESTRIÇÃO: Técnicos só acedem à página detalhe de documentos atribuídos ou criados por eles
-    if getattr(request.user, 'eh_tecnico', False):
-        if documento.responsavel_atual != request.user and documento.criado_por != request.user:
-            from django.http import HttpResponseForbidden
-            return HttpResponseForbidden("Não tem permissão para aceder a este documento.")
 
     # Limpar notificações pendentes deste documento para este usuário
     Notificacao.objects.filter(
@@ -424,6 +419,8 @@ def detalhe_documento(request, documento_id):
         # if request.user.nivel_acesso in CustomUser.NIVEIS_TECNICO:
         #     pode_encaminhar = False
         
+        is_chefia = request.user.nivel_sigilo >= 1
+        
         # Caso 1: Usuário está em uma SECÇÃO
         if user_seccao:
             # ISOLAMENTO ESTRITO: Chefe só mexe no que é DA SECÇÃO.
@@ -431,20 +428,17 @@ def detalhe_documento(request, documento_id):
             # Se for TÉCNICO, ele vê o documento mas não o formulário de encaminhamento geral (tratado no template/form).
             pode_encaminhar = (documento.seccao_atual == user_seccao)
             
-            # RESTRIÇÃO:
-            # - Chefia: tramitação bloqueada APENAS se já DISTRIBUIU a um técnico
-            #   (responsavel_atual é um técnico diferente do chefe).
-            #   Se responsavel_atual é o criador ou o próprio chefe, tramitação fica disponível.
-            # - Técnicos: bloqueados se o responsável é outro técnico.
-            is_chefia = request.user.nivel_sigilo >= 1
-            if documento.responsavel_atual and documento.responsavel_atual != request.user:
+            # RESTRIÇÃO DE AÇÃO:
+            if documento.responsavel_atual != request.user:
                 if is_chefia:
-                    # Chefia: bloqueia APENAS se o responsável é um técnico (distribuição explícita)
-                    resp = documento.responsavel_atual
-                    if getattr(resp, 'nivel_sigilo', 0) < 1 and resp != documento.criado_por:
-                        pode_encaminhar = False
+                    # Chefia: bloqueia apenas se estiver com um técnico (já distribuído)
+                    if documento.responsavel_atual:
+                        resp = documento.responsavel_atual
+                        if getattr(resp, 'nivel_sigilo', 0) < 1 and resp != documento.criado_por:
+                            pode_encaminhar = False
                 else:
-                    # Técnico: bloqueia se o responsável é outro
+                    # TÉCNICO: Não pode agir se não for o responsável atual 
+                    # (evita enviar 2x ou "puxar" o que não lhe foi dado)
                     pode_encaminhar = False
                 
         # Caso 2: Usuário está DIRETO no DEPARTAMENTO (sem secção)
@@ -454,13 +448,13 @@ def detalhe_documento(request, documento_id):
                     documento.seccao_atual is None
             )
             
-            # RESTRIÇÃO: Mesma lógica para Diretores
-            is_chefia = request.user.nivel_sigilo >= 1
-            if documento.responsavel_atual and documento.responsavel_atual != request.user:
+            # RESTRIÇÃO DE AÇÃO:
+            if documento.responsavel_atual != request.user:
                 if is_chefia:
-                    resp = documento.responsavel_atual
-                    if getattr(resp, 'nivel_sigilo', 0) < 1 and resp != documento.criado_por:
-                        pode_encaminhar = False
+                    if documento.responsavel_atual:
+                        resp = documento.responsavel_atual
+                        if getattr(resp, 'nivel_sigilo', 0) < 1 and resp != documento.criado_por:
+                            pode_encaminhar = False
                 else:
                     pode_encaminhar = False
 

@@ -36,25 +36,27 @@ class DocumentoManager(SoftDeleteManager):
         # --- NOVA LÓGICA DE CONFIDENCIALIDADE E HIERARQUIA ---
         
         # Se for Técnico (Nível 0), aplica filtro restritivo "NEED-TO-KNOW"
-        if getattr(user, 'eh_tecnico', True): # Default True se não tiver atributo
+        if getattr(user, 'eh_tecnico', False):
              return qs.filter(
                 Q(criado_por=user) |            # Meus documentos (criados)
-                Q(responsavel_atual=user)       # Atribuídos a mim (distribuídos)
+                Q(responsavel_atual=user) |     # Atribuídos a mim (distribuídos)
+                Q(movimentacoes__usuario=user)  # Que eu já movimentei (histórico)
              ).distinct()
 
         # Se for Chefia/Direção (Nivel >= 1), vê tudo do seu setor + Histórico
         # (Mantém lógica original de setor, mas agora restrita a chefes)
 
-        # 2. Usuário de Secção (Chefia Nível 1 e Técnicos)
+        # 2. Usuário de Secção (Chefia Nível 1)
         if hasattr(user, 'seccao') and user.seccao:
             # ISOLAMENTO ESTRITO:
             # Vê APENAS documentos que estão fisicamente na secção (seccao_atual = secção)
             # OU documentos que foram enviados para a secção (movimentacao destino = secção)
-            # Documentos do departamento pai (sem secção) NÃO são visíveis.
-            
+            # OU histórico próprio (criou ou movimentou)
             return qs.filter(
                 Q(seccao_atual=user.seccao) |
-                Q(movimentacoes__seccao_destino=user.seccao)
+                Q(movimentacoes__seccao_destino=user.seccao) |
+                Q(criado_por=user) |
+                Q(movimentacoes__usuario=user)
             ).distinct()
 
         # 3. Usuário de Departamento (Direção Nível 2)
@@ -65,11 +67,16 @@ class DocumentoManager(SoftDeleteManager):
             return qs.filter(
                 Q(departamento_atual=user.departamento, seccao_atual__isnull=True) |
                 Q(movimentacoes__departamento_origem=user.departamento) |
-                Q(movimentacoes__departamento_destino=user.departamento)
+                Q(movimentacoes__departamento_destino=user.departamento) |
+                Q(criado_por=user) |
+                Q(movimentacoes__usuario=user)
             ).distinct()
 
-        # 4. Fallback
-        return qs.filter(criado_por=user).distinct()
+        # 4. Fallback (Garante pelo menos o que ele criou ou movimentou)
+        return qs.filter(
+            Q(criado_por=user) |
+            Q(movimentacoes__usuario=user)
+        ).distinct()
 
 
 class AdministracaoManager(models.Manager):
