@@ -121,7 +121,7 @@
                         <i data-lucide="message-square" class="w-4 h-4 text-sga-red"></i>
                         <h3 class="text-xs font-black uppercase tracking-widest text-slate-500">Pareceres e Observações Técnicas</h3>
                     </div>
-                    <div class="divide-y divide-slate-50">
+                    <div class="divide-y divide-slate-50" id="pareceres-container">
                         {% if documento.observacoes %}
                             <div class="p-6 flex gap-4 bg-red-50/30">
                                 <div class="w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center flex-shrink-0">
@@ -134,16 +134,20 @@
                                             {{ documento.criado_por.get_full_name|default:documento.criado_por.username }}
                                         </span>
                                     </div>
-                                    <p class="text-sm text-slate-600 leading-relaxed italic">
-                                        "{{ documento.observacoes|safe }}"
-                                    </p>
+                                    <div class="text-sm text-slate-600 leading-relaxed italic relative">
+                                        <p class="parecer-text line-clamp-2 transition-all duration-300">
+                                            "{{ documento.observacoes|safe }}"
+                                        </p>
+                                        <button type="button" class="btn-ler-mais hidden text-[10px] font-bold text-sga-red hover:text-red-700 uppercase tracking-wider mt-1">Ler mais</button>
+                                    </div>
                                 </div>
                             </div>
                         {% endif %}
 
                         {% for obs in observacoes %}
                             {% if obs.observacoes or obs.despacho %}
-                                <div class="p-6 flex gap-4">
+                                <!-- Mostrar apenas o mais recente; esconder restantes -->
+                                <div class="p-6 flex gap-4 parecer-item {% if not forloop.first %}hidden parecer-antigo{% endif %}">
                                     <div class="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center flex-shrink-0">
                                         <i data-lucide="quote" class="w-5 h-5 text-slate-300"></i>
                                     </div>
@@ -163,16 +167,22 @@
                                         </div>
                                         
                                         {% if obs.observacoes %}
-                                            <p class="text-sm text-slate-600 leading-relaxed italic mb-2">
-                                                "{{ obs.observacoes|safe }}"
-                                            </p>
+                                            <div class="text-sm text-slate-600 leading-relaxed italic mb-2 relative">
+                                                <div class="parecer-text line-clamp-2 transition-all duration-300">
+                                                    "{{ obs.observacoes|safe }}"
+                                                </div>
+                                                <button type="button" class="btn-ler-mais hidden text-[10px] font-bold text-sga-blue hover:text-blue-700 uppercase tracking-wider mt-1">Ler mais</button>
+                                            </div>
                                         {% endif %}
                                         
                                         {% if obs.despacho %}
                                             <div class="mt-2 p-3 bg-slate-50 rounded-lg border-l-4 border-slate-200">
                                                 <span class="text-[10px] font-bold text-slate-400 uppercase block mb-1">Despacho:</span>
-                                                <div class="text-sm text-slate-700">
-                                                    {{ obs.despacho|safe }}
+                                                <div class="text-sm text-slate-700 relative">
+                                                    <div class="parecer-text line-clamp-2 transition-all duration-300">
+                                                        {{ obs.despacho|safe }}
+                                                    </div>
+                                                    <button type="button" class="btn-ler-mais hidden text-[10px] font-bold text-slate-500 hover:text-slate-800 uppercase tracking-wider mt-1">Ler mais</button>
                                                 </div>
                                             </div>
                                         {% endif %}
@@ -188,6 +198,15 @@
                             {% endif %}
                         {% endfor %}
                     </div>
+                    
+                    {% if observacoes|length > 1 %}
+                    <div class="px-6 py-4 bg-slate-50 border-t border-slate-100 text-center">
+                        <button type="button" id="btn-ver-todos-pareceres" class="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-slate-500 hover:text-slate-800 transition-colors">
+                            <i data-lucide="chevron-down" class="w-4 h-4 transition-transform duration-300" id="icon-ver-todos"></i>
+                            <span id="text-ver-todos">Ver históricos anteriores ({{ observacoes|length|add:"-1" }})</span>
+                        </button>
+                    </div>
+                    {% endif %}
                 </div>
 
                 <!-- Formulários de Ação (Apenas se tiver permissão) -->
@@ -439,14 +458,14 @@
                         <h3 class="text-xs font-black uppercase tracking-widest text-slate-500">Fluxo de Tramitação</h3>
                     </div>
                     
-                    <div class="relative pl-6 space-y-10 group/timeline">
+                    <div class="relative pl-6 space-y-10 group/timeline" id="fluxo-container">
                         <!-- Linha Central -->
                         <div class="absolute left-[7px] top-1 bottom-1 w-0.5 bg-slate-100 group-hover/timeline:bg-slate-200 transition-colors"></div>
 
-                        {% for mov in movimentacoes %}
-                        <div class="relative">
+                        {% for mov in movimentacoes|slice:":5" %}
+                        <div class="relative fluxo-item">
                             <!-- Marcador -->
-                            <div class="absolute -left-[23px] top-1.5 w-4 h-4 rounded-full bg-white border-4 border-sga-red shadow-sm z-10 transition-transform group-hover:scale-125"></div>
+                            <div class="absolute -left-[23px] top-1.5 w-4 h-4 rounded-full bg-white border-4 {% if forloop.first %}border-sga-red scale-110{% else %}border-slate-300{% endif %} shadow-sm z-10 transition-transform group-hover:scale-125"></div>
                             
                             <div class="flex flex-col">
                                 <time class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
@@ -987,9 +1006,68 @@
             if (e.key === '-') zoomOut();
         });
 
+        // --- NOVA LÓGICA DE UI COMPRESSA (Pareceres e Fluxo) ---
+        
+        // 1. Lógica "Ler mais" nos Pareceres Longos
+        $(document).ready(function() {
+            $('.parecer-text').each(function() {
+                // Se o texto for alto o suficiente para ser truncado pelas 2 linhas (aprox 40px)
+                if (this.scrollHeight > 60) {
+                    $(this).siblings('.btn-ler-mais').removeClass('hidden');
+                }
+            });
+            
+            $('.btn-ler-mais').on('click', function() {
+                const $btn = $(this);
+                const $texto = $btn.siblings('.parecer-text');
+                
+                if ($texto.hasClass('line-clamp-2')) {
+                    $texto.removeClass('line-clamp-2');
+                    $btn.text('Ler menos');
+                } else {
+                    $texto.addClass('line-clamp-2');
+                    $btn.text('Ler mais');
+                }
+            });
+            
+            // 2. Lógica "Ver todos os pareceres"
+            $('#btn-ver-todos-pareceres').on('click', function() {
+                const $btn = $(this);
+                const $icon = $('#icon-ver-todos');
+                const $items = $('.parecer-antigo');
+                
+                if ($items.hasClass('hidden')) {
+                    $items.removeClass('hidden').hide().slideDown(300);
+                    $icon.css('transform', 'rotate(180deg)');
+                    $('#text-ver-todos').text('Ocultar históricos anteriores');
+                } else {
+                    $items.slideUp(300, function() { $(this).addClass('hidden'); });
+                    $icon.css('transform', 'rotate(0deg)');
+                    $('#text-ver-todos').text('Ver históricos anteriores (' + $items.length + ')');
+                }
+            });
+            
+            // 3. Lógica "Ver fluxo completo" (Timeline)
+            $('#btn-ver-fluxo-completo').on('click', function() {
+                const $container = $('#fluxo-antigo-container');
+                const $icon = $('#icon-fluxo-completo');
+                const totalEscondidos = $('#fluxo-antigo-container .fluxo-item').length;
+                
+                if ($container.hasClass('hidden')) {
+                    $container.removeClass('hidden').hide().slideDown(400);
+                    $icon.addClass('text-sga-red');
+                    $('#text-fluxo-completo').text('Ocultar fluxo antigo');
+                } else {
+                    $container.slideUp(400, function() { $(this).addClass('hidden'); });
+                    $icon.removeClass('text-sga-red');
+                    $('#text-fluxo-completo').text('Ver o fluxo completo (' + totalEscondidos + ' anteriores)');
+                }
+            });
+        });
+
     </script>
 
-    <!-- Bloquear Impressão via CSS -->
+    <!-- Bloquear Impressão via CSS e estilos da scrollbar -->
     <style>
         @media print { 
             #docViewerModal { display: none !important; } 
