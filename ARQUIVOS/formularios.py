@@ -161,6 +161,14 @@ class EncaminharDocumentoForm(forms.ModelForm):
 
         if self.documento:
             self.instance.documento = self.documento
+            
+        if self.user:
+            self.instance.usuario = self.user
+            if getattr(self.user, 'seccao', None):
+                self.instance.seccao_origem = self.user.seccao
+                self.instance.departamento_origem = self.user.seccao.departamento
+            else:
+                self.instance.departamento_origem = getattr(self.user, 'departamento_efetivo', None)
 
         self.fields['tipo_movimentacao'].choices = [
             ('criacao',        'Criar'),
@@ -317,6 +325,7 @@ class EncaminharDocumentoForm(forms.ModelForm):
                 if not sec_geral:
                     raise ValidationError(f'A administração {dest_hierarquico.nome} não possui uma Secretaria Geral configurada para receber documentos.')
                 cleaned_data['departamento_destino'] = sec_geral
+                self.instance.departamento_destino = sec_geral
             
             # Se for destino municipal, validar e converter da mesma forma
             if dest_municipal:
@@ -324,6 +333,7 @@ class EncaminharDocumentoForm(forms.ModelForm):
                 if not sec_geral:
                     raise ValidationError(f'A administração {dest_municipal.nome} não possui uma Secretaria Geral configurada para receber documentos.')
                 cleaned_data['departamento_destino'] = sec_geral
+                self.instance.departamento_destino = sec_geral
             
         return cleaned_data
 

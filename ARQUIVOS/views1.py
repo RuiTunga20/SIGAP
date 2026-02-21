@@ -430,7 +430,7 @@ def criar_documento(request):
             )
 
             messages.success(request, f'Documento {documento.numero_protocolo} criado com sucesso!')
-            return redirect('Encaminhar', documento_id=mv.id)
+            return redirect('detalhe_documento', documento_id=documento.id)
     else:
         form = DocumentoForm()
 

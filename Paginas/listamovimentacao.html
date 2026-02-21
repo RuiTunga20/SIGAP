@@ -84,7 +84,7 @@
                             </td>
                             <td class="px-8 py-6 text-right">
                                 <div class="flex items-center justify-end gap-2">
-                                    <a href="{% url 'Encaminhar' documento.id %}" class="inline-flex items-center gap-2 px-4 py-2 bg-sga-red hover:bg-red-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-red-100 hover:-translate-y-0.5" title="Reencaminhar">
+                                    <a href="{% url 'detalhe_documento' documento.documento.id %}" class="inline-flex items-center gap-2 px-4 py-2 bg-sga-red hover:bg-red-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-red-100 hover:-translate-y-0.5" title="Reencaminhar">
                                         <i data-lucide="send" class="w-3.5 h-3.5"></i>
                                         Tramitar
                                     </a>

@@ -1032,7 +1032,7 @@ def criar_documento(request):
                      return redirect('Painel')
                  return redirect('detalhe_documento', documento_id=documento.id)
             
-            return redirect('Encaminhar', documento_id=mv.id)
+            return redirect('detalhe_documento', documento_id=documento.id)
     else:
         form = DocumentoForm()
 
@@ -1163,7 +1163,7 @@ def encaminhar_documento(request, documento_id):
         ).update(lida=True)
     except MovimentacaoDocumento.DoesNotExist:
         messages.error(request, 'Movimentação não encontrada.')
-        return redirect('lista_documentos')
+        return redirect('listar_documentos')
 
     # Validação de permissões
     # Validação de permissões (RELAXADA)

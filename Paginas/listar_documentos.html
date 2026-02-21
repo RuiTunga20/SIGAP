@@ -149,7 +149,7 @@
                                 {% endif %}
 
                                 {% if user.nivel_acesso in 'admin,diretor,gerente,admin_sistema' %}
-                                <a href="{% url 'Encaminhar' documento.id %}" 
+                                <a href="{% url 'detalhe_documento' documento.id %}" 
                                    title="Encaminhar"
                                    class="inline-flex items-center justify-center w-10 h-10 bg-slate-100 hover:bg-slate-900 hover:text-white text-slate-400 rounded-xl transition-all shadow-sm group/btn"
                                 >
