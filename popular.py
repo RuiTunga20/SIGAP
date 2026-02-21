@@ -44,9 +44,9 @@ ESTRUTURA = {
 
         # --- SERVIÇOS DE APOIO TÉCNICO E INSTRUMENTAL ---
         "Secretaria Geral": [
-            "Secção de Orçamento e Finanças",
-            "Secção de Património e Logística",
-            "Secção de Expediente Geral"
+            "Secção de Orçamento, Finanças e Contratação Pública",
+            "Secção de Património, Logística e Protocolo",
+            "Secção de Expediente"
         ],
         "Gabinete de Estudos, Planeamento e Estatística (GEPE)": [
             "Secção de Estudos e Estatística",

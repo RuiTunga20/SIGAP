@@ -235,14 +235,21 @@ class EncaminharDocumentoForm(forms.ModelForm):
             user_admin = self.user.administracao
             
             def dept_label(obj):
+                # Se for da mesma administração, mostrar apenas o nome
                 if user_admin and obj.administracao == user_admin:
                     return obj.nome
-                return f"{obj.nome} ({obj.administracao.nome if obj.administracao else '?'})"
+                # Se for externo, mostrar a administração e o tipo para clareza
+                tipo = obj.get_tipo_municipio_display() if hasattr(obj, 'get_tipo_municipio_display') else ""
+                admin_nome = obj.administracao.nome if obj.administracao else "Geral"
+                return f"{obj.nome} ({admin_nome} [{tipo}])"
                 
             def sec_label(obj):
+                # Para secções internas, apenas o nome
                 if user_admin and obj.administracao == user_admin:
                     return obj.nome
-                return f"{obj.nome} [{obj.administracao.nome if obj.administracao else '?'}]"
+                # Para secções externas (raro, mas possível), mostrar contexto
+                admin_nome = obj.administracao.nome if obj.administracao else "?"
+                return f"{obj.nome} [{admin_nome}]"
 
             self.fields['departamento_destino'].label_from_instance = dept_label
             self.fields['seccao_destino'].label_from_instance = sec_label
@@ -280,9 +287,7 @@ class EncaminharDocumentoForm(forms.ModelForm):
             self.seccoes_data = None
             self.is_governo_secretaria = False
 
-        self.fields['seccao_destino'].label_from_instance = lambda obj: obj.nome
-        self.fields['destino_hierarquico'].label_from_instance = lambda obj: obj.nome
-        self.fields['destino_municipal'].label_from_instance = lambda obj: obj.nome
+
 
     def clean(self):
         cleaned_data = super().clean()

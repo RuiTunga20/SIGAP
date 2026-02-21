@@ -291,9 +291,10 @@ def _calcular_destinos_permitidos(user, ctx=None, incluir_self=True):
             (Q(administracao=governo_prov, nome__icontains='Secretaria Geral') if governo_prov else Q(pk__in=[]))
         ).distinct()
 
-    # Padrão
+    # Padrão: Apenas departamentos da PRÓPRIA administração
     else:
-        qs_dept_base = Departamento.objects.para_administracao(admin)
+        # CORREÇÃO: Filtrar estritamente pela administração do usuário para evitar vazamento de "Tipo A, B, C..."
+        qs_dept_base = Departamento.objects.filter(administracao=admin)
 
     # =========================================================================
     # PARTE 2: Aplicar restrições por cenário
