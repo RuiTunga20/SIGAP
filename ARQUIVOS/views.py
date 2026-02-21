@@ -431,14 +431,13 @@ def detalhe_documento(request, documento_id):
             # RESTRIÇÃO DE AÇÃO:
             if documento.responsavel_atual != request.user:
                 if is_chefia:
-                    # Chefia: bloqueia apenas se estiver com um técnico (já distribuído)
+                    # Chefia: bloqueia o Encaminhamento (Tramitação) se estiver distribuído a um técnico
                     if documento.responsavel_atual:
                         resp = documento.responsavel_atual
                         if getattr(resp, 'nivel_sigilo', 0) < 1 and resp != documento.criado_por:
                             pode_encaminhar = False
                 else:
                     # TÉCNICO: Não pode agir se não for o responsável atual 
-                    # (evita enviar 2x ou "puxar" o que não lhe foi dado)
                     pode_encaminhar = False
                 
         # Caso 2: Usuário está DIRETO no DEPARTAMENTO (sem secção)

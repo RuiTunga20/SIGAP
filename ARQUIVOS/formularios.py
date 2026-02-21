@@ -214,7 +214,11 @@ class EncaminharDocumentoForm(forms.ModelForm):
             user_admin = self.user.administracao
             is_gov = user_admin and user_admin.tipo_municipio == 'G'
             is_sec_geral = _is_secretaria_geral(getattr(self.user, 'departamento_efetivo', None))
-            self.is_governo_secretaria = is_gov and is_sec_geral and self.show_external
+            
+            # CORREÇÃO: Mesmo se for Secretaria Geral, se o usuário estiver em uma SECÇÃO, 
+            # ele NÃO age como gestor da Secretaria, mas sim como Chefe daquela Unidade.
+            in_seccao = getattr(self.user, 'seccao', None) is not None
+            self.is_governo_secretaria = is_gov and is_sec_geral and self.show_external and not in_seccao
             
             if self.is_governo_secretaria:
                 # Separar destinos: Governos/MAT vs Administrações Municipais
@@ -1111,9 +1115,9 @@ class DistribuirDocumentoForm(forms.Form):
             if seccao:
                 qs = qs.filter(seccao=seccao)
             elif dept:
-                # Inclui usuários DIRETOS do departamento OU usuários das SECÇÕES desse departamento
-                from django.db.models import Q
-                qs = qs.filter(Q(departamento=dept) | Q(seccao__departamento=dept))
+                # Inclui estritamente os técnicos vinculados diretamente ao departamento
+                # Exclui técnicos que pertencem a uma secção subordinada
+                qs = qs.filter(departamento=dept, seccao__isnull=True)
                 
             self.fields['tecnico'].queryset = qs.order_by('first_name')
             self.fields['tecnico'].label_from_instance = lambda u: f"{u.get_full_name()} ({u.username})"
