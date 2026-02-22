@@ -32,6 +32,7 @@ from .hierarchy_manager import (
     validar_destino_encaminhamento,
     obter_label_dinamico,
     obter_secretaria_geral,
+    obter_seccao_secretaria,
     _get_contexto_usuario,
 )
 
@@ -331,14 +332,31 @@ class EncaminharDocumentoForm(forms.ModelForm):
                     raise ValidationError(f'A administração {dest_hierarquico.nome} não possui uma Secretaria Geral configurada para receber documentos.')
                 cleaned_data['departamento_destino'] = sec_geral
                 self.instance.departamento_destino = sec_geral
+                # Redirecionamento automático para Expediente/Secretaria da Secretaria Geral
+                seccao_auto = obter_seccao_secretaria(sec_geral)
+                if seccao_auto:
+                    cleaned_data['seccao_destino'] = seccao_auto
+                    self.instance.seccao_destino = seccao_auto
             
             # Se for destino municipal, validar e converter da mesma forma
-            if dest_municipal:
+            elif dest_municipal:
                 sec_geral = obter_secretaria_geral(dest_municipal)
                 if not sec_geral:
                     raise ValidationError(f'A administração {dest_municipal.nome} não possui uma Secretaria Geral configurada para receber documentos.')
                 cleaned_data['departamento_destino'] = sec_geral
                 self.instance.departamento_destino = sec_geral
+                # Redirecionamento automático para Expediente/Secretaria da Secretaria Geral
+                seccao_auto = obter_seccao_secretaria(sec_geral)
+                if seccao_auto:
+                    cleaned_data['seccao_destino'] = seccao_auto
+                    self.instance.seccao_destino = seccao_auto
+            
+            # Se selecionou apenas Departamento, tentar redirecionar para sua Secretaria interna
+            elif dept_destino and not sec_destino:
+                seccao_auto = obter_seccao_secretaria(dept_destino)
+                if seccao_auto:
+                    cleaned_data['seccao_destino'] = seccao_auto
+                    self.instance.seccao_destino = seccao_auto
             
         return cleaned_data
 

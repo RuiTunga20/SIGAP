@@ -431,3 +431,30 @@ def obter_secretaria_geral(administracao):
         administracao=administracao,
         nome__icontains='Secretaria Geral'
     ).first()
+
+def obter_seccao_secretaria(departamento):
+    """
+    Retorna a secção de 'Secretaria' ou 'Expediente' de um departamento.
+    Utilizado para redirecionamento automático.
+    
+    REGRA: Ignora se o próprio departamento já for uma Secretaria.
+    """
+    if not departamento:
+        return None
+    
+    # Se o departamento já for uma Secretaria Geral, não redireciona para subssecção
+    if _is_secretaria_geral(departamento):
+        return None
+    
+    # Padrão de busca para secções de secretaria/expediente
+    # 'Expediente' é comum em Administrações (Secção de Expediente)
+    # 'Secretário' ou 'Secretariado' é comum em Gabinetes
+    termo_busca = Q(nome__icontains='Expediente') | \
+                  Q(nome__icontains='Secretaria') | \
+                  Q(nome__icontains='Secretário') | \
+                  Q(nome__icontains='Secretária') | \
+                  Q(nome__icontains='Secretariado')
+    
+    return Seccoes.objects.filter(
+        departamento=departamento
+    ).filter(termo_busca).first()

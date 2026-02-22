@@ -38,6 +38,7 @@ from .formularios import (
 )
 from .decorators import requer_contexto_hierarquico, requer_mesma_administracao
 from .consumers import send_notification_sync, send_pendencia_update_sync
+from .hierarchy_manager import obter_seccao_secretaria
 
 @login_required
 @requer_mesma_administracao
@@ -977,8 +978,11 @@ def criar_documento(request):
             # CORREÇÃO CRÍTICA: Definir secção atual se o usuário estiver em uma
             if seccao_usuario:
                 documento.seccao_atual = seccao_usuario
-                # O responsável atual pode ser mantido como o criador (técnico) por enquanto,
-                # ou atribuído ao chefe da secção. Vamos manter o criador para que ele veja "Na Posse".
+            else:
+                # Se o usuário não está em uma secção (ex: Diretor), tenta redirecionar para a Secretaria interna
+                seccao_auto = obter_seccao_secretaria(departamento_usuario)
+                if seccao_auto:
+                    documento.seccao_atual = seccao_auto
             
             documento.responsavel_atual = request.user
             
