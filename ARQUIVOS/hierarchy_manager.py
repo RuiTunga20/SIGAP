@@ -173,14 +173,20 @@ class HierarchyManager:
 
     def usuario_pode_encaminhar_externo(self):
         """Helper para verificar se o usuário pode enviar para fora da sua administração.
-        RESTRITO: Apenas utilizadores na Secretaria Geral."""
-        from .models import CustomUser
+        RESTRITO: Apenas utilizadores na Secretaria Geral que NÃO estejam em uma secção."""
         
         # Técnicos NUNCA podem encaminhar (nem interno nem externo)
         if getattr(self.user, 'eh_tecnico', False):
             return False
+            
+        # OBTENÇÃO DIRETA para evitar falhas de contexto
+        user_seccao = getattr(self.user, 'seccao', None)
         
-        # APENAS Secretaria Geral pode encaminhar externamente
+        # Se o usuário ESTÁ em uma secção, NUNCA pode encaminhar externamente
+        if user_seccao and user_seccao.pk:
+            return False
+        
+        # APENAS Secretaria Geral SEM SECÇÃO pode encaminhar externamente
         if _is_secretaria_geral(self.ctx['dept']):
             return True
             

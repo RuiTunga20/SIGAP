@@ -12,19 +12,22 @@ from ARQUIVOS.models import Administracao, Departamento, Seccoes
 # Definição da Estrutura
 ESTRUTURA_GOVERNO = {
     "Gabinete do Governador Provincial": [
+        "Governador Provincial",
         "Assessor do Governador",
-        "Diretor de Gabinete do Governador",
-        "Diretor Adjunto de Gabinete do Governador",
+        "Director de Gabinete do Governador",
+        "Director Adjunto de Gabinete do Governador",
         "Secretário(a) do Governador"
     ],
     "Gabinete do Vice-Governador para o Sector Político, Social e Económico": [
+        "Vice-Governador",
         "Assessor Vice-Governador para o Sector Político, Social e Económico",
-        "Diretor de Gabinete do Vice-Governador para o Sector Político, Social e Económico",
+        "Director de Gabinete do Vice-Governador para o Sector Político, Social e Económico",
         "Secretário(a) do Vice-Governador para o Sector Político, Social e Económico"
     ],
     "Gabinete do Vice-Governador para os Serviços Técnicos e Infra-estruturas": [
+        "Vice-Governador",
         "Assessor do Vice-Governador para os Serviços Técnicos e Infra-estruturas",
-        "Diretor do Gabinete do Vice-Governador para os Serviços Técnicos e Infra-estruturas",
+        "Director do Gabinete do Vice-Governador para os Serviços Técnicos e Infra-estruturas",
         "Secretário(a) do Vice-Governador para os Serviços Técnicos e Infra-estruturas"
     ],
     "Secretaria Geral": [

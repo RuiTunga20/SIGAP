@@ -184,6 +184,10 @@ class EncaminharDocumentoForm(forms.ModelForm):
             
             # Obter destinos
             self.show_external = manager.usuario_pode_encaminhar_externo()
+            
+            # REFORÇO: Se o utilizador pertence a uma secção, NUNCA mostra externo
+            if getattr(self.user, 'seccao', None):
+                self.show_external = False
             # Filtro de Técnicos de Secção (Nível 0)
             # Regra: Técnico não encaminha para fora. Só DEVOLVE à chefia da sua secção.
             if getattr(self.user, 'eh_tecnico', False) and getattr(self.user, 'seccao', None):
@@ -298,6 +302,7 @@ class EncaminharDocumentoForm(forms.ModelForm):
             self.seccoes_fixas = False
             self.seccoes_data = None
             self.is_governo_secretaria = False
+            self.show_external = False
 
 
 

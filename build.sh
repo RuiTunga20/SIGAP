@@ -34,6 +34,7 @@ python popular_mat.py
 echo "--- Populando Administrações ---"
 python popular_administracoes.py
 python popular_governos.py
+python popular_seccoes_especiais.py
 
 echo "--- Populando Departamentos Base ---"
 python popular.py

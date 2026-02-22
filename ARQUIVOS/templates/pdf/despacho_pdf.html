@@ -5,28 +5,30 @@
     <style>
         @page {
             size: A4;
-            margin: 2.5cm;
+            margin: 2.5cm 2.5cm 4cm 2.5cm;
             @frame footer {
                 -pdf-frame-content: footerContent;
-                bottom: 1cm;
+                bottom: 0.5cm;
                 margin-left: 2.5cm;
                 margin-right: 2.5cm;
-                height: 2cm;
+                height: 3cm;
             }
         }
         body {
             font-family: Helvetica, Arial, sans-serif;
             font-size: 10pt;
-            line-height: 1.4;
+            line-height: 1.5;
             color: #000;
         }
+
+        /* CABEÇALHO */
         .header {
             text-align: center;
             margin-bottom: 20px;
         }
         .brasao {
             width: 65px;
-            margin-bottom: 5px;
+            margin-bottom: 8px;
         }
         .header h1 {
             font-size: 11pt;
@@ -40,68 +42,117 @@
             margin: 1px 0;
             text-transform: uppercase;
         }
-        .destinatario {
-            margin-top: 40px;
-            margin-left: 50%;
+
+        /* DESTINATÁRIO via tabela para garantir posição à direita no renderer PDF */
+        .destinatario-wrapper {
+            width: 100%;
+            margin-top: 30px;
+        }
+        .destinatario-wrapper table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .destinatario-wrapper td.esquerda {
+            width: 50%;
+        }
+        .destinatario-wrapper td.direita {
+            width: 50%;
             font-weight: bold;
             font-size: 10pt;
+            line-height: 1.5;
+            vertical-align: top;
         }
-        .destinatario .ao { margin-bottom: 5px; }
-        .destinatario .tratamento { margin-bottom: 5px; }
-        .destinatario .nome { margin-bottom: 5px; text-transform: uppercase; }
-        .destinatario .cidade {
+        .cidade {
             font-size: 11pt;
             text-decoration: underline;
             text-transform: uppercase;
+            display: block;
+            margin-top: 8px;
         }
+
+        /* REFERÊNCIA */
         .referencia {
-            margin-top: 30px;
-            font-weight: bold;
-            font-size: 9pt;
-        }
-        .saudacao {
-            margin-top: 20px;
-            font-style: italic;
-            font-size: 9pt;
-        }
-        .conteudo {
             margin-top: 25px;
+            font-weight: bold;
+            font-size: 10pt;
+        }
+
+        /* SAUDAÇÃO */
+        .saudacao {
+            margin-top: 18px;
+            font-style: italic;
+            font-size: 10pt;
+        }
+
+        /* CONTEÚDO */
+        .conteudo {
+            margin-top: 18px;
             text-align: justify;
-            min-height: 200px;
+            font-size: 10pt;
+            line-height: 1.5;
         }
-        .fecho {
-            margin-top: 30px;
-            font-size: 9pt;
-        }
+
+        /* DATA */
         .data-local {
             margin-top: 20px;
             font-weight: bold;
             font-style: italic;
-            font-size: 9pt;
+            font-size: 10pt;
         }
+
+        /* ASSINATURA */
         .assinatura-bloco {
-            margin-top: 50px;
+            margin-top: 35px;
             text-align: center;
         }
         .cargo {
             font-weight: bold;
-            font-size: 9pt;
-            margin-bottom: 35px;
+            font-size: 10pt;
             text-transform: uppercase;
         }
-        .linha-assinatura {
-            width: 250px;
-            border-top: 1px solid black;
-            margin: 0 auto;
+        /* Linha de assinatura via border-top numa célula de tabela */
+        .assinatura-linha-wrapper {
+            margin: 35px auto 0 auto;
+            width: 260px;
         }
-        .nome-assinatura {
-            margin-top: 5px;
-            font-weight: bold;
-            font-size: 9pt;
-            text-transform: uppercase;
+        .assinatura-linha-wrapper table {
+            width: 100%;
+            border-collapse: collapse;
         }
-        #footerContent {
+        .assinatura-linha-wrapper td {
+            border-top: 1px solid #000;
             text-align: center;
+            font-weight: bold;
+            font-size: 10pt;
+            text-transform: uppercase;
+            padding-top: 4px;
+        }
+
+        /* RODAPÉ */
+        #footerContent {
+            width: 100%;
+        }
+        .footer-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .footer-table td {
+            vertical-align: top;
+            font-size: 8pt;
+            line-height: 1.4;
+        }
+        .footer-endereco {
+            text-align: left;
+            width: 35%;
+        }
+        .footer-logo {
+            text-align: center;
+            width: 30%;
+            vertical-align: middle;
+        }
+        .footer-contacto {
+            text-align: right;
+            width: 35%;
         }
         .logo-governo {
             width: 140px;
@@ -109,6 +160,8 @@
     </style>
 </head>
 <body>
+
+    <!-- CABEÇALHO -->
     <div class="header">
         {% if brasao_path %}
             <img class="brasao" src="{{ brasao_path }}">
@@ -122,46 +175,78 @@
         {% endfor %}
     </div>
 
-    <div class="destinatario">
-        <div class="ao">AO</div>
-        <div class="tratamento">EXMO SENHOR</div>
-        <div class="nome">{{ documento.utente|upper }}</div>
-        <div class="cidade">{{ admin.provincia|upper }}</div>
+    <!-- DESTINATÁRIO -->
+    <div class="destinatario-wrapper">
+        <table>
+            <tr>
+                <td class="esquerda"></td>
+                <td class="direita">
+                    AO<br>
+                    EXMO SENHOR<br>
+                    {{ documento.utente|upper }}<br>
+                    <span class="cidade">{{ admin.provincia|upper }}</span>
+                </td>
+            </tr>
+        </table>
     </div>
 
+    <!-- REFERÊNCIA -->
     <div class="referencia">
-        Ref. nº: ____/{{ documento.numero_protocolo }}
+        Ref. nº:{{ documento.numero_protocolo }}
     </div>
 
+    <!-- SAUDAÇÃO -->
     <div class="saudacao">
         Sobejados Cumprimentos.
     </div>
 
+    <!-- CORPO DO DESPACHO -->
     <div class="conteudo">
         {{ texto_despacho|safe }}
     </div>
 
-    <div class="fecho">
-        Nada mais havendo, reformulamos os votos iniciais, com alta estima e consideração.
-    </div>
-
+    <!-- DATA E LOCAL -->
     <div class="data-local">
         {{ data_texto }}
     </div>
 
+    <!-- ASSINATURA -->
     <div class="assinatura-bloco">
         <div class="cargo">{{ cargo_texto }}</div>
-        <div class="linha-assinatura"></div>
-        <div class="nome-assinatura">{{ nome_responsavel|upper }}</div>
+        <div class="assinatura-linha-wrapper">
+            <table>
+                <tr>
+                    <td>{{ nome_responsavel|upper }}</td>
+                </tr>
+            </table>
+        </div>
     </div>
 
+    <!-- RODAPÉ -->
     <div id="footerContent">
-        {% if logo_path %}
-            <img class="logo-governo" src="{{ logo_path }}">
-        {% elif brasao_path %}
-            <img class="brasao" style="width: 40px;" src="{{ brasao_path }}">
-            <div style="font-size: 8pt; font-weight: bold; margin-top: 2px;">GOVERNO DE ANGOLA</div>
-        {% endif %}
+        <table class="footer-table">
+            <tr>
+                <td class="footer-endereco">
+                    {% if admin.endereco %}
+                        {{ admin.endereco|linebreaksbr }}
+                    {% endif %}
+                </td>
+                <td class="footer-logo">
+                    {% if logo_path %}
+                        <img class="logo-governo" src="{{ logo_path }}">
+                    {% elif brasao_path %}
+                        <img style="width: 40px;" src="{{ brasao_path }}">
+                        <div style="font-size: 8pt; font-weight: bold; margin-top: 2px;">GOVERNO DE ANGOLA</div>
+                    {% endif %}
+                </td>
+                <td class="footer-contacto">
+                    {% if admin.contacto %}
+                        {{ admin.contacto|linebreaksbr }}
+                    {% endif %}
+                </td>
+            </tr>
+        </table>
     </div>
+
 </body>
 </html>

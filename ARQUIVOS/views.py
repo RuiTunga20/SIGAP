@@ -16,6 +16,7 @@ from django.db import transaction
 from .formularios import *
 from django.db.models import Count, Case, When, IntegerField
 from django.core.mail import EmailMessage
+from django.template.loader import render_to_string
 from ARQUIVOS.utils import gerar_pdf_despacho
 from django.urls import reverse
 from ARQUIVOS.decorators import requer_contexto_hierarquico
@@ -517,8 +518,25 @@ def detalhe_documento(request, documento_id):
     
     # Verificação robusta de permissão de distribuição
     tem_permissao_distribuir = getattr(request.user, 'pode_distribuir', lambda: False)()
-    
+
+    # Verificação de existência de técnicos no setor para distribuir
+    tem_tecnicos_no_setor = False
     if tem_permissao_distribuir:
+        if user_seccao:
+            tem_tecnicos_no_setor = CustomUser.objects.filter(
+                seccao=user_seccao,
+                nivel_sigilo=0,
+                is_active=True
+            ).exclude(pk=request.user.pk).exists()
+        elif user_departamento:
+            tem_tecnicos_no_setor = CustomUser.objects.filter(
+                departamento=user_departamento,
+                seccao__isnull=True,
+                nivel_sigilo=0,
+                is_active=True
+            ).exclude(pk=request.user.pk).exists()
+
+    if tem_permissao_distribuir and tem_tecnicos_no_setor:
         # Cenário 1: Chefe de Secção
         if user_seccao:
             # Pode distribuir se o documento está NA SECÇÃO
@@ -798,30 +816,31 @@ def detalhe_documento(request, documento_id):
                     # 3. Enviar Email se o documento tiver email associado
                     if documento.email:
                         assunto = f"Notificação de Despacho - Protocolo {documento.numero_protocolo}"
-                        mensagem = f"""
-                        Prezado(a) {documento.utente},
                         
-                        O seu documento com número de protocolo {documento.numero_protocolo} recebeu um despacho.
+                        # Contexto para o template de email
+                        email_context = {
+                            'utente': documento.utente or "Utente",
+                            'protocolo': documento.numero_protocolo,
+                            'titulo': documento.titulo,
+                            'status': documento.get_status_display(),
+                            'administracao': request.user.administracao.nome if request.user.administracao else 'Administração SIGAP',
+                            'ano': timezone.now().year
+                        }
                         
-                        Estado Atual: {documento.get_status_display()}
-                        
-                        Segue em anexo o documento oficial com os detalhes do despacho.
-                        
-                        Atenciosamente,
-                        {request.user.administracao.nome if request.user.administracao else 'Sistema de Gestão de Arquivo'}
-                        """
+                        mensagem_html = render_to_string('emails/despacho_email.html', email_context)
                         
                         email = EmailMessage(
                             assunto,
-                            mensagem,
+                            mensagem_html,
                             None, # De (usará o DEFAULT_FROM_EMAIL)
                             [documento.email]
                         )
+                        email.content_subtype = "html" # Define como HTML
                         
                         # Anexar o PDF gerado (ler do content file)
                         pdf_content.seek(0)
                         email.attach(pdf_content.name, pdf_content.read(), 'application/pdf')
-                        email.send(fail_silently=True)
+                        email.send(fail_silently=False)
                         
                         messages.success(request, f'Despacho registado e notificação enviada para {documento.email}.')
                     else:

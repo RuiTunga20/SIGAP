@@ -23,16 +23,26 @@ def popular_seccoes_especiais():
         'Gabinete do Administrador Municipal': [
             'Administrador Municipal',
             'Assessor do Administrador Municipal',
-            'Diretor de Gabinete do Administrador Municipal',
+            'Director de Gabinete do Administrador Municipal',
             'Secretário do Administrador Municipal'
         ],
         'Gabinete do Administrador Municipal Adjunto para a Área Técnica, Infra-estruturas e Serviços Comunitários': [
             'Administrador Municipal Adjunto para a Área Técnica',
+            'Director de Gabinete do Administrador Municipal Adjunto',
             'Secretário do Administrador Municipal Adjunto'
         ],
         'Gabinete do Administrador Municipal Adjunto para a Área Política, Social e Económica': [
             'Administrador Municipal Adjunto para a Área Política e Social',
+            'Director de Gabinete do Administrador Municipal Adjunto',
             'Secretário do Administrador Municipal Adjunto'
+        ]
+    }
+
+    # Estrutura Simplificada para Administrações Tipo E
+    ESTRUTURA_TIPO_E = {
+        'Gabinete do Administrador Municipal': [
+            'Administrador Municipal',
+            'Secretário do Administrador Municipal'
         ]
     }
 
@@ -46,26 +56,17 @@ def popular_seccoes_especiais():
     for admin in administracoes:
         print(f".", end="", flush=True) # Progresso visual
         
-        # O tipo E tem estrutura simplificada, mas geralmente tem Administrador.
-        # Vamos assumir que TODOS têm Gabinete do Administrador.
-        # Ajuste conforme necessidade: se Tipo E não tiver Adjuntos, podemos filtrar.
-        
-        # Filtrar Adjuntos para Tipo E? O decreto 270/24 define estruturas.
-        # Tipo D e E geralmente têm menos adjuntos ou apenas 1.
-        # Por segurança, vamos criar TODAS as estruturas para A, B, C, D.
-        # E para E, talvez apenas o Administrador?
-        # O requisito não especificou filtro por tipo, então vou aplicar a todos para garantir,
-        # ou aplicar lógica baseada no tipo se for crítico.
-        # Assumindo que todos têm pelo menos o Administrador.
-        
         estruturas_a_criar = {}
         
-        # Gabinete do Administrador (Para TODOS)
-        estruturas_a_criar['Gabinete do Administrador Municipal'] = ESTRUTURA_ESPECIAL['Gabinete do Administrador Municipal']
+        if admin.tipo_municipio == 'E':
+            # Tipo E tem estrutura simplificada
+            estruturas_a_criar = ESTRUTURA_TIPO_E
+        else:
+            # Gabinete do Administrador (Para A, B, C, D)
+            estruturas_a_criar['Gabinete do Administrador Municipal'] = ESTRUTURA_ESPECIAL['Gabinete do Administrador Municipal']
 
-        # Adjuntos (Apenas para A, B, C, D) - Simplificação
-        if admin.tipo_municipio in ['A', 'B', 'C', 'D']:
-             estruturas_a_criar.update({k:v for k,v in ESTRUTURA_ESPECIAL.items() if k != 'Gabinete do Administrador Municipal'})
+            # Adjuntos (Para A, B, C, D)
+            estruturas_a_criar.update({k:v for k,v in ESTRUTURA_ESPECIAL.items() if k != 'Gabinete do Administrador Municipal'})
 
         for dept_nome, seccoes_nomes in estruturas_a_criar.items():
             # 1. Criar/Obter Departamento (Gabinete)

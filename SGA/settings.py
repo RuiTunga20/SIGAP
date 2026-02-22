@@ -226,3 +226,20 @@ if DEBUG:
             },
         },
     }
+
+# =============================================================================
+# EMAIL CONFIGURATION (SMTP)
+# =============================================================================
+
+# Em produção (Render/Docker), use variáveis de ambiente para segurança.
+# Localmente (DEBUG=True), podemos usar o console backend para testar sem enviar emails reais
+
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST =  'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = 'ruitunga20@gmail.com'
+EMAIL_HOST_PASSWORD = '@10102015Rt@'
+
+# E-mail que aparecerá como remetente nas notificações
+DEFAULT_FROM_EMAIL = 'SIGAP <noreply@sigap.gov>'
