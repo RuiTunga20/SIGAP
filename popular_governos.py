@@ -114,35 +114,25 @@ ESTRUTURA_GOVERNO = {
 def popular_governos():
     print("Iniciando população dos Governos Provinciais...")
     
-    # Lista Oficial das 18 Províncias de Angola
+    # Lista Oficial das Províncias de Angola (Nova Divisão)
     PROVINCIAS = [
-        "Bengo", "Benguela", "Bié", "Cabinda", "Cuando Cubango", 
+        "Bengo", "Benguela", "Bié", "Cabinda", "Cuando", "Cubango",
         "Cuanza Norte", "Cuanza Sul", "Cunene", "Huambo", "Huíla", 
-        "Luanda", "Lunda Norte", "Lunda Sul", "Malanje", "Moxico", 
-        "Namibe", "Uíge", "Zaire"
+        "Ícolo e Bengo", "Luanda", "Lunda Norte", "Lunda Sul", 
+        "Malanje", "Moxico", "Moxico Leste", "Namibe", "Uíge", "Zaire"
     ]
     
     for provincia_nome in PROVINCIAS:
-        nome_governo = f"Governo Provincial de {provincia_nome}" # ou "do Uíge", "de Luanda"... Ajuste simples
-        
-        # Ajuste gramatical simples (opcional)
+        # Lógica de preposição para o nome do Governo
         prefixo = "de"
-        if provincia_nome in ["Uíge", "Bié", "Zaire", "Moxico", "Bengo", "Huambo", "Namibe"]: 
+        if provincia_nome in ["Uíge", "Bié", "Zaire", "Moxico", "Bengo", "Huambo", "Namibe", "Cuando", "Cubango"]: 
              prefixo = "do"
-        elif provincia_nome in ["Huíla", "Lunda Norte", "Lunda Sul", "Benguela", "Cabinda"]:
-             prefixo = "da" # Governo Provincial da Huíla? Geralmente usa-se "de" genérico ou ajusta-se 
-             # Para simplificar e manter padrão, usarei "de" ou "do"
-        
-        # Melhor abordagem: Nome fixo padronizado ou ajustar string
-        if provincia_nome in ["Uíge", "Bié", "Zaire", "Moxico", "Bengo", "Huambo"]:
-             nome_governo = f"Governo Provincial do {provincia_nome}"
-        elif provincia_nome in ["Lunda Norte", "Lunda Sul", "Huíla", "Benguela", "Cabinda"]:
-              nome_governo = f"Governo Provincial da {provincia_nome}"
-        else:
-             nome_governo = f"Governo Provincial de {provincia_nome}"
-
-        # FIX: Padronização para evitar erros de acentuação/preposição
-        # Vamos usar o nome da província direto do array para o campo 'provincia'
+        elif provincia_nome in ["Huíla", "Lunda Norte", "Lunda Sul", "Benguela", "Cabinda", "Moxico Leste"]:
+             prefixo = "da"
+        elif provincia_nome == "Ícolo e Bengo":
+             prefixo = "do"
+             
+        nome_governo = f"Governo Provincial {prefixo} {provincia_nome}"
         
         print(f"Processando: {nome_governo}")
         

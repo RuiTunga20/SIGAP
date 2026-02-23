@@ -45,8 +45,12 @@ def criar_usuarios_padrao():
                 base_name = normalize_name(admin.provincia)
                 prefix = "Gov"
             else:
-                # Para Administrações, usamos o nome do município (ex: Aduige)
-                base_name = normalize_name(admin.nome)
+                # Para Administrações, extraímos apenas o nome do município
+                # Removendo "Administração Municipal d[e/o/a] " do início do nome
+                clean_name = admin.nome
+                clean_name = re.sub(r'^Administração Municipal [d][eoa]? ', '', clean_name, flags=re.IGNORECASE)
+                
+                base_name = normalize_name(clean_name)
                 prefix = "Ad"
             
             # Formata o username (ex: aduige, govuige)

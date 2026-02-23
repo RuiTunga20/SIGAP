@@ -33,25 +33,25 @@ ADMINISTRACOES = {
         'Bié': ['Andulo', 'Cuito'],
         'Cabinda': ['Cabinda'],
         'Cuando': ['Mavinga'],
-        'Cuanza-Norte': ['Cazengo', 'Cambambe'],
-        'Cuanza-Sul': ['Gabela', 'Sumbe'],
+        'Cuanza Norte': ['Cazengo', 'Cambambe'],
+        'Cuanza Sul': ['Gabela', 'Sumbe'],
         'Cubango': ['Menongue'],
         'Cunene': ['Cuanhama'],
         'Huambo': ['Bailundo', 'Caála', 'Huambo'],
         'Huíla': ['Lubango', 'Matala'],
-        'Icolo e Bengo': ['Catete', 'Calumbo'],
+        'Ícolo e Bengo': ['Catete', 'Calumbo'],
         'Luanda': [
-            'Sequele', 'Cacuaco', 'Cazenga', 'Kilamba Kiaxi', 'Ingombota',
+            'Luanda', 'Sequele', 'Cacuaco', 'Cazenga', 'Kilamba Kiaxi', 'Ingombota',
             'Viana', 'Talatona', 'Maianga', 'Rangel', 'Samba', 'Sambizanga',
             'Hoji ya Henda', 'Kilamba', 'Belas', 'Camama'
         ],
-        'Lunda-Norte': ['Dundo'],
-        'Lunda-Sul': ['Saurimo'],
+        'Lunda Norte': ['Dundo'],
+        'Lunda Sul': ['Saurimo'],
         'Malanje': ['Malanje'],
         'Moxico Leste': ['Cazombo'],
         'Moxico': ['Luena'],
         'Namibe': ['Moçamedes'],
-        'Uíge': ['Uige'],
+        'Uíge': ['Uíge'],
         'Zaire': ['Mbanza Kongo', 'Soyo'],
     },
     
@@ -63,14 +63,14 @@ ADMINISTRACOES = {
         'Benguela': ['Baía Farta', 'Ganda', 'Navegantes'],
         'Bié': ['Camacupa', 'Nharea', 'Chinguar'],
         'Cabinda': ['Cacongo'],
-        'Cuanza-Sul': ['Porto Amboím', 'Quibala', 'Seles', 'Waku Kungo', 'Gangula'],
+        'Cuanza Sul': ['Porto Amboím', 'Quibala', 'Seles', 'Waku Kungo', 'Gangula'],
         'Cubango': ['Cuchi'],
         'Cunene': ['Namacunde', 'Ombadja'],
         'Huíla': ['Caconda', 'Caluquembe', 'Chibia', 'Humpata'],
-        'Icolo e Bengo': ['Bom Jesus'],
+        'Ícolo e Bengo': ['Bom Jesus'],
         'Luanda': ['Mulenvos'],
-        'Lunda-Norte': ['Chitato', 'Cuango', 'Lucapa', 'Mussungue', 'Cafunfo'],
-        'Lunda-Sul': ['Muconda', 'Cassengo'],
+        'Lunda Norte': ['Chitato', 'Cuango', 'Lucapa', 'Mussungue', 'Cafunfo'],
+        'Lunda Sul': ['Muconda', 'Cassengo'],
         'Malanje': ['Calandula', 'Cacuso'],
         'Moxico Leste': ['Luau'],
         'Namibe': ['Tombwa'],
@@ -86,16 +86,16 @@ ADMINISTRACOES = {
         'Bié': ['Chitembo', 'Catabola', 'Cunhinga', 'Cuemba', 'Calucinga'],
         'Cabinda': ['Buco Zau', 'Liambo'],
         'Cuando': ['Cuito Cuanavale'],
-        'Cuanza-Norte': ['Golungo Alto', 'Ambaca'],
-        'Cuanza-Sul': ['Calulo', 'Cassongue', 'Mussende', 'Ebo', 'Condé'],
+        'Cuanza Norte': ['Golungo Alto', 'Ambaca'],
+        'Cuanza Sul': ['Calulo', 'Cassongue', 'Mussende', 'Ebo', 'Condé'],
         'Cubango': ['Caiundo', 'Savate'],
         'Cunene': ['Cahama'],
         'Huambo': ['Cachiungo', 'Chicala Choloanga', 'Londuimbali', 'Mungo'],
         'Huíla': ['Cacula', 'Chicomba', 'Jamba Mineira', 'Quipungo', 'Hoque', 'Palanca'],
-        'Icolo e Bengo': ['Quiçama', 'Cabo Ledo'],
+        'Ícolo e Bengo': ['Quiçama', 'Cabo Ledo'],
         'Luanda': ['Mussulo'],
-        'Lunda-Norte': ['Cambulo'],
-        'Lunda-Sul': ['Cacolo', 'Dala', 'Muangueji'],
+        'Lunda Norte': ['Cambulo'],
+        'Lunda Sul': ['Cacolo', 'Dala', 'Muangueji'],
         'Moxico': ['Lumbala Nguimbo'],
         'Malanje': ['Cangandala', 'Cambundi Catembo'],
         'Namibe': ['Bibala', 'Sacomar'],
@@ -110,13 +110,13 @@ ADMINISTRACOES = {
         'Bengo': ['Bula Atumba', 'Pango Aluquém'],
         'Benguela': ['Chongorói', 'Caimbambo'],
         'Cabinda': ['Belize', 'Ngoio'],
-        'Cuanza-Norte': ['Banga', 'Bolongongo', 'Lucala', 'Quiculungo', 'Samba Cajú'],
-        'Cuanza-Sul': ['Conda', 'Quilenda', 'Boa Entrada'],
+        'Cuanza Norte': ['Banga', 'Bolongongo', 'Lucala', 'Quiculungo', 'Samba Cajú'],
+        'Cuanza Sul': ['Conda', 'Quilenda', 'Boa Entrada'],
         'Cubango': ['Calai', 'Cuangar', 'Nancova', 'Cutato'],
         'Cunene': ['Curoca', 'Cuvelai'],
         'Huambo': ['Chinjenje', 'Ecunha', 'Ucuma', 'Longonjo', 'Alto Hama', 'Cuima'],
         'Huíla': ['Chipindo', 'Cuvango', 'Gambos', 'Quilengues'],
-        'Lunda-Norte': ['Capenda Camulemba', 'Caungula', 'Cuilo', 'Lóvua', 'Lubalo', 'Xá Muteba'],
+        'Lunda Norte': ['Capenda Camulemba', 'Caungula', 'Cuilo', 'Lóvua', 'Lubalo', 'Xá Muteba'],
         'Malanje': ['Cahombo', 'Kiwaba Nzoji', 'Kunda dya Baze', 'Quela'],
         'Moxico': ['Camanongue', 'Cangamba', 'Léua', 'Cameia'],
         'Moxico Leste': ['Luacano'],
@@ -140,11 +140,11 @@ ADMINISTRACOES = {
         ],
         'Cabinda': ['Massabi', 'Miconje', 'Necuto', 'Tando Zinze'],
         'Cuando': ['Dirico', 'Rivungo', 'Luiana', 'Mucusso', 'Xipundo', 'Dima', 'Luengue'],
-        'Cuanza-Norte': [
+        'Cuanza Norte': [
             'Ngonguembo', 'Aldeia Nova', 'Caculo Cabaça', 'Cerca',
             'Luinga', 'Massangano', 'Tango', 'Terreiro'
         ],
-        'Cuanza-Sul': [
+        'Cuanza Sul': [
             'Pambangala', 'Amboiva', 'Lonhe', 'Munenga', 'Quissongo',
             'Quenha', 'Quirimbo', 'Sanga', 'Gungo'
         ],
@@ -155,11 +155,11 @@ ADMINISTRACOES = {
             'Capunda Cavilongo', 'Dongo', 'Galangue', 'Capelongo',
             'Chituto', 'Viti Vivali', 'Chicungo'
         ],
-        'Icolo e Bengo': ['Cabiri'],
-        'Lunda-Norte': [
+        'Ícolo e Bengo': ['Cabiri'],
+        'Lunda Norte': [
             'Cassanje Calucala', 'Luangue', 'Xá Cassau', 'Luremo', 'Camaxilo', 'Canzar'
         ],
-        'Lunda-Sul': [
+        'Lunda Sul': [
             'Alto Chicapa', 'Cazage', 'Chiluage', 'Luma Cassai',
             'Muriege', 'Sombo', 'Xassengue', 'Cassai - Sul'
         ],
@@ -194,8 +194,21 @@ def popular_administracoes():
     for tipo, provincias in ADMINISTRACOES.items():
         for provincia, municipios in provincias.items():
             for municipio in municipios:
+                # Lógica de preposição para o nome da Administração
+                prefixo = "de"
+                if municipio in ["Uíge", "Bié", "Zaire", "Moxico", "Bengo", "Huambo", "Namibe", "Cuando", "Cubango", "Ícolo e Bengo", "Moxico Leste", "Cazombo", "Luau", "Luacano", "Catete"]: 
+                    prefixo = "do"
+                elif municipio in ["Huíla", "Lunda Norte", "Lunda Sul", "Benguela", "Cabinda"]:
+                    prefixo = "da"
+                
+                nome_admin = f"Administração Municipal {prefixo} {municipio}"
+                
+                # Se for a capital Luanda, ajuste fino
+                if municipio == "Luanda":
+                    nome_admin = "Administração Municipal de Luanda"
+
                 obj, created = Administracao.objects.update_or_create(
-                    nome=municipio,
+                    nome=nome_admin,
                     defaults={
                         'tipo_municipio': tipo,
                         'provincia': provincia,
@@ -205,10 +218,10 @@ def popular_administracoes():
                 
                 if created:
                     criadas += 1
-                    print(f"[+] Criada: {municipio} - Tipo {tipo} - {provincia}")
+                    print(f"[+] Criada: {nome_admin} - Tipo {tipo} - {provincia}")
                 else:
                     atualizadas += 1
-                    print(f"[=] Atualizada: {municipio} - Tipo {tipo} - {provincia}")
+                    print(f"[=] Atualizada: {nome_admin} - Tipo {tipo} - {provincia}")
     
     print(f"\n{'='*60}")
     print(f"RESUMO - Decreto Presidencial n.º 270/24 de 29 de novembro")

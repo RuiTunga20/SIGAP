@@ -25,8 +25,8 @@ fi
 
 # Popular Banco de Dados (Ordem Importante)
 
-echo "--- Populando Municípios ---"
-python manage.py populate_municipios
+# echo "--- Populando Municípios (LEGADO) ---"
+# python manage.py populate_municipios # Removido em favor de popular_administracoes.py
 
 echo "--- Populando MAT ---"
 python popular_mat.py

@@ -12,17 +12,20 @@ from ARQUIVOS.models import Administracao, Departamento, Seccoes
 # Definição da Estrutura do MAT
 ESTRUTURA_MAT = {
     "Gabinete do Ministro": [
+        "Ministro",
         "Assessor do Ministro",
         "Director de Gabinete do Ministro",
         "Director Adjunto de Gabinete do Ministro",
         "Secretário(a) do Ministro"
     ],
     "Gabinete do Secretário de Estado para Administração do Território": [
+        "Secretário de Estado para Administração do Território",
         "Assessor do Secretário de Estado para Administração do Território",
         "Director de Gabinete do Secretário de Estado para Administração do Território",
         "Secretário(a) do Secretário de Estado para Administração do Território"
     ],
     "Gabinete do Secretário de Estado para as Autarquias Locais": [
+        "Secretário de Estado para as Autarquias Locais",
         "Assessor do Secretário de Estado para as Autarquias Locais",
         "Director do Gabinete do Secretário de Estado para as Autarquias Locais",
         "Secretário(a) do Secretário de Estado para as Autarquias Locais"
@@ -80,14 +83,17 @@ def popular_mat():
     
     nome_mat = "Ministério da Administração do Território"
     
-    # Criar ou Obter a Administração do MAT
-    mat, created = Administracao.objects.get_or_create(
-        nome=nome_mat,
-        defaults={
-            'tipo_municipio': 'M',
-            'provincia': 'Luanda' # Sede em Luanda
-        }
-    )
+    # Buscar Administração existente (usando filter().first() para evitar MultipleObjectsReturned)
+    mat = Administracao.objects.filter(nome=nome_mat).first()
+    created = False
+    
+    if not mat:
+        mat = Administracao.objects.create(
+            nome=nome_mat,
+            tipo_municipio='M',
+            provincia='Luanda'
+        )
+        created = True
     
     if created:
         print(f"  > Criado novo Ministério: {nome_mat}")
