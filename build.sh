@@ -36,8 +36,8 @@ python popular_administracoes.py
 python popular_governos.py
 python popular_seccoes_especiais.py
 
-echo "--- Populando Departamentos Base ---"
-python popular.py
+# echo "--- Populando Departamentos Base ---"
+# python popular.py # OBSOLETO - Removido em favor de popular_departamentos.py
 
 echo "--- Populando Departamentos e Secções (Decreto 270/24) ---"
 python popular_departamentos.py
@@ -46,12 +46,12 @@ python popular_departamentos.py
 echo "--- Populando Tipos de Documentos ---"
 python tipodocumentos.py
 
-echo "--- Adicionando Adjuntos por Tipo ---"
-python adicionar_adjuntos_tipo_a.py
-python adicionar_adjuntos_tipo_b.py
-python adicionar_adjuntos_tipo_c.py
-python adicionar_adjuntos_tipo_d.py
-python adicionar_adjuntos_tipo_e.py
+# Adjuntos agora são criados por popular_seccoes_especiais.py
+# python adicionar_adjuntos_tipo_a.py
+# python adicionar_adjuntos_tipo_b.py
+# python adicionar_adjuntos_tipo_c.py
+# python adicionar_adjuntos_tipo_d.py
+# python adicionar_adjuntos_tipo_e.py
 
 echo "--- Criando Usuários Padrão das Administrações ---"
 python criar_usuarios_padrao.py
