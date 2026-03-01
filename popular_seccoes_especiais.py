@@ -1,6 +1,11 @@
 """
 Script para criar Secções Especiais (Cargos como Secções) nos Gabinetes.
-Conforme solicitação para Hierarquia Estrita e Sigilo.
+Conforme Manual de Configuração do SIGAP e Decreto Presidencial n.º 270/24.
+
+Política Universal de Gabinete:
+- Cada gabinete tem: Titular, Assessor, Director de Gabinete, Secretário(a)
+- Director Adjunto de Gabinete apenas para Ministro e Governador
+- A mesma estrutura aplica-se a MAT, Governos e Administrações
 """
 import os
 import django
@@ -13,60 +18,90 @@ django.setup()
 
 from ARQUIVOS.models import Administracao, Departamento, Seccoes
 
-def popular_seccoes_especiais():
-    print("="*80)
-    print("POPULANDO SECÇÕES ESPECIAIS (GABINETES E ASSESSORES)")
-    print("="*80)
 
-    # Definição das Estruturas Especiais
-    ESTRUTURA_ESPECIAL = {
+def popular_seccoes_especiais():
+    print("=" * 80)
+    print("POPULANDO SECÇÕES ESPECIAIS (GABINETES E CARGOS)")
+    print("Política Universal: Titular + Assessor + Dir. Gabinete + Secretário(a)")
+    print("=" * 80)
+
+    # =========================================================================
+    # ESTRUTURA PARA ADMINISTRAÇÕES MUNICIPAIS (Tipos A, B, C)
+    # 2 Adjuntos com áreas específicas
+    # =========================================================================
+    ESTRUTURA_2_ADJUNTOS = {
         'Gabinete do Administrador Municipal': [
             'Administrador Municipal',
             'Assessor do Administrador Municipal',
             'Director de Gabinete do Administrador Municipal',
-            'Secretário do Administrador Municipal'
+            'Secretário do Administrador Municipal',
         ],
         'Gabinete do Administrador Municipal Adjunto para a Área Técnica, Infra-estruturas e Serviços Comunitários': [
             'Administrador Municipal Adjunto para a Área Técnica',
-            'Director de Gabinete do Administrador Municipal Adjunto',
-            'Secretário do Administrador Municipal Adjunto'
+            'Assessor do Administrador Municipal Adjunto para a Área Técnica',
+            'Director de Gabinete do Administrador Municipal Adjunto para a Área Técnica',
+            'Secretário do Administrador Municipal Adjunto para a Área Técnica',
         ],
         'Gabinete do Administrador Municipal Adjunto para a Área Política, Social e Económica': [
             'Administrador Municipal Adjunto para a Área Política e Social',
-            'Director de Gabinete do Administrador Municipal Adjunto',
-            'Secretário do Administrador Municipal Adjunto'
-        ]
+            'Assessor do Administrador Municipal Adjunto para a Área Política e Social',
+            'Director de Gabinete do Administrador Municipal Adjunto para a Área Política e Social',
+            'Secretário do Administrador Municipal Adjunto para a Área Política e Social',
+        ],
     }
 
-    # Estrutura Simplificada para Administrações Tipo E
+    # =========================================================================
+    # ESTRUTURA PARA TIPO D — 1 Adjunto (sem área específica)
+    # =========================================================================
+    ESTRUTURA_TIPO_D = {
+        'Gabinete do Administrador Municipal': [
+            'Administrador Municipal',
+            'Assessor do Administrador Municipal',
+            'Director de Gabinete do Administrador Municipal',
+            'Secretário do Administrador Municipal',
+        ],
+        'Gabinete do Administrador Municipal Adjunto': [
+            'Administrador Municipal Adjunto',
+            'Assessor do Administrador Municipal Adjunto',
+            'Director de Gabinete do Administrador Municipal Adjunto',
+            'Secretário do Administrador Municipal Adjunto',
+        ],
+    }
+
+    # =========================================================================
+    # ESTRUTURA PARA TIPO E — 1 Adjunto (simplificada, sem Assessor no adj.)
+    # =========================================================================
     ESTRUTURA_TIPO_E = {
         'Gabinete do Administrador Municipal': [
             'Administrador Municipal',
-            'Secretário do Administrador Municipal'
-        ]
+            'Assessor do Administrador Municipal',
+            'Director de Gabinete do Administrador Municipal',
+            'Secretário do Administrador Municipal',
+        ],
+        'Gabinete do Administrador Municipal Adjunto': [
+            'Administrador Municipal Adjunto',
+            'Secretário do Administrador Municipal Adjunto',
+        ],
     }
 
-    administracoes = Administracao.objects.all()
+    administracoes = Administracao.objects.exclude(tipo_municipio__in=['G', 'M'])
     total_admins = administracoes.count()
-    print(f"Processando {total_admins} administrações...")
+    print(f"Processando {total_admins} administrações municipais...")
 
     count_dept = 0
     count_sec = 0
 
     for admin in administracoes:
-        print(f".", end="", flush=True) # Progresso visual
-        
-        estruturas_a_criar = {}
-        
-        if admin.tipo_municipio == 'E':
-            # Tipo E tem estrutura simplificada
-            estruturas_a_criar = ESTRUTURA_TIPO_E
-        else:
-            # Gabinete do Administrador (Para A, B, C, D)
-            estruturas_a_criar['Gabinete do Administrador Municipal'] = ESTRUTURA_ESPECIAL['Gabinete do Administrador Municipal']
+        print(f".", end="", flush=True)
 
-            # Adjuntos (Para A, B, C, D)
-            estruturas_a_criar.update({k:v for k,v in ESTRUTURA_ESPECIAL.items() if k != 'Gabinete do Administrador Municipal'})
+        # Seleccionar estrutura conforme tipo
+        if admin.tipo_municipio == 'E':
+            estruturas_a_criar = ESTRUTURA_TIPO_E
+        elif admin.tipo_municipio == 'D':
+            estruturas_a_criar = ESTRUTURA_TIPO_D
+        else:
+            # Tipos A, B, C — 2 adjuntos com áreas
+            estruturas_a_criar = ESTRUTURA_2_ADJUNTOS
 
         for dept_nome, seccoes_nomes in estruturas_a_criar.items():
             # 1. Criar/Obter Departamento (Gabinete)
@@ -80,7 +115,7 @@ def popular_seccoes_especiais():
             )
             if created_dept:
                 count_dept += 1
-            
+
             # 2. Criar Secções (Cargos)
             for sec_nome in seccoes_nomes:
                 sec, created_sec = Seccoes.objects.get_or_create(
@@ -93,11 +128,12 @@ def popular_seccoes_especiais():
                 if created_sec:
                     count_sec += 1
 
-    print(f"\n\n{'='*80}")
+    print(f"\n\n{'=' * 80}")
     print(f"CONCLUÍDO!")
     print(f"Departamentos (Gabinetes) Criados: {count_dept}")
-    print(f"Secções (Cargos) Criadas:        {count_sec}")
-    print(f"{'='*80}")
+    print(f"Secções (Cargos) Criadas:          {count_sec}")
+    print(f"{'=' * 80}")
+
 
 if __name__ == "__main__":
     popular_seccoes_especiais()

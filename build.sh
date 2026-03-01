@@ -42,6 +42,9 @@ python popular.py
 echo "--- Populando Departamentos e Secções (Decreto 270/24) ---"
 python popular_departamentos.py
 
+echo "--- Limpando Estrutura Obsoleta ---"
+python limpar_estrutura_obsoleta.py
+
 echo "--- Populando Tipos de Documentos ---"
 python tipodocumentos.py
 

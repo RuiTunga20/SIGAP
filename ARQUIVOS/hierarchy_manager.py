@@ -27,6 +27,107 @@ def _is_secretaria_geral(departamento) -> bool:
     return "secretaria geral" in departamento.nome.lower()
 
 
+def _is_gabinete(departamento) -> bool:
+    """
+    Verifica se um departamento é um Gabinete (político/executivo).
+    Aplica-se a: Gabinete do Ministro, Gabinete do Governador,
+    Gabinete do Administrador, Gabinete do Vice-Governador, etc.
+    """
+    if not departamento:
+        return False
+    nome = departamento.nome.lower()
+    return nome.startswith('gabinete ')
+
+
+# Constantes para papéis dentro de um Gabinete
+PAPEL_TITULAR = 'TITULAR'
+PAPEL_DIRECTOR_GABINETE = 'DIRECTOR_GABINETE'
+PAPEL_DIRECTOR_ADJUNTO = 'DIRECTOR_ADJUNTO'
+PAPEL_ASSESSOR = 'ASSESSOR'
+PAPEL_SECRETARIO = 'SECRETARIO'
+PAPEL_DESCONHECIDO = 'DESCONHECIDO'
+
+
+def _obter_papel_gabinete(seccao) -> str:
+    """
+    Identifica o papel/cargo do utilizador dentro de um Gabinete
+    com base no nome da Secção (cargo).
+    
+    Returns:
+        str: Uma das constantes PAPEL_*
+    """
+    if not seccao:
+        return PAPEL_DESCONHECIDO
+    
+    nome = seccao.nome.lower()
+    
+    # Director Adjunto de Gabinete (verificar ANTES de Director de Gabinete)
+    if 'director adjunto' in nome and 'gabinete' in nome:
+        return PAPEL_DIRECTOR_ADJUNTO
+    
+    # Director de Gabinete
+    if ('director de gabinete' in nome or 'director do gabinete' in nome or
+            ('director' in nome and 'gabinete' in nome)):
+        return PAPEL_DIRECTOR_GABINETE
+    
+    # Assessor
+    if 'assessor' in nome:
+        return PAPEL_ASSESSOR
+    
+    # Secretário(a)
+    if 'secretário' in nome or 'secretária' in nome or 'secretario' in nome:
+        return PAPEL_SECRETARIO
+    
+    # Titular (Ministro, Governador, Vice-Governador, Administrador, Adjunto)
+    titulares_keywords = [
+        'ministro', 'governador', 'vice-governador',
+        'administrador municipal', 'secretário de estado',
+    ]
+    for kw in titulares_keywords:
+        if kw in nome:
+            return PAPEL_TITULAR
+    
+    return PAPEL_DESCONHECIDO
+
+
+def _filtrar_seccoes_gabinete(dept, seccao, papel):
+    """
+    Aplica as restrições de tramitação dentro de um Gabinete.
+    
+    Regras:
+    - SECRETÁRIO: Pode enviar para Director de Gabinete e Assessor APENAS
+    - ASSESSOR: Pode enviar para Secretário e Director de Gabinete APENAS
+    - DIRECTOR DE GABINETE / DIRECTOR ADJUNTO: Pode enviar para TODOS (incluindo Titular)
+    - TITULAR: Pode despachar para TODOS
+    """
+    todas_seccoes = Seccoes.objects.filter(departamento=dept).exclude(pk=seccao.pk)
+    
+    if papel == PAPEL_SECRETARIO:
+        # Secretário(a) NUNCA envia ao Titular — só Dir. Gabinete e Assessor
+        return todas_seccoes.filter(
+            Q(nome__icontains='Director') | Q(nome__icontains='Assessor')
+        )
+    
+    elif papel == PAPEL_ASSESSOR:
+        # Assessor envia para Secretário e Director de Gabinete
+        return todas_seccoes.filter(
+            Q(nome__icontains='Director') |
+            Q(nome__icontains='Secretário') | Q(nome__icontains='Secretária') |
+            Q(nome__icontains='Secretario')
+        )
+    
+    elif papel in (PAPEL_DIRECTOR_GABINETE, PAPEL_DIRECTOR_ADJUNTO):
+        # ÚNICO autorizado a enviar ao Titular — vê TODOS
+        return todas_seccoes
+    
+    elif papel == PAPEL_TITULAR:
+        # Despacha para todos
+        return todas_seccoes
+    
+    # Papel desconhecido — vê apenas Dir. Gabinete (segurança)
+    return todas_seccoes.filter(nome__icontains='Director')
+
+
 def _get_contexto_usuario(user):
     """
     Retorna o contexto resolvido do usuário.
@@ -308,12 +409,13 @@ def _calcular_destinos_permitidos(user, ctx=None, incluir_self=True):
 
     if em_seccao:
         # -----------------------------------------------------------------
-        # CENÁRIO A: Usuário em Secção (CORRIGIDO!)
+        # CENÁRIO A: Usuário em Secção
         # 
         # COMPORTAMENTO:
         # - Dept disponível: Se for CHEFE (nivel_sigilo >= 1), vê todos os departamentos da base.
         #                  Se for TÉCNICO, vê apenas o departamento pai (já tratado acima, mas mantemos segurança).
         # - Secções disponíveis: todas do mesmo dept, exceto a própria.
+        # - GABINETE: Aplica restrições de tramitação (Secretário ↛ Titular)
         # -----------------------------------------------------------------
         
         if getattr(user, 'nivel_sigilo', 0) >= 2:
@@ -325,11 +427,18 @@ def _calcular_destinos_permitidos(user, ctx=None, incluir_self=True):
         else:
             qs_dept_final = Departamento.objects.filter(pk=dept.pk) if dept else Departamento.objects.none()
         
-        qs_sec_final = Seccoes.objects.filter(
-            departamento=dept,
-        ).exclude(
-            pk=seccao.pk,
-        ).order_by('nome') if dept else Seccoes.objects.none()
+        # === RESTRIÇÃO DE GABINETE ===
+        # Se o utilizador está numa secção de Gabinete, aplica política de tramitação
+        if _is_gabinete(dept):
+            papel = _obter_papel_gabinete(seccao)
+            qs_sec_final = _filtrar_seccoes_gabinete(dept, seccao, papel).order_by('nome')
+        else:
+            # Comportamento normal (fora de gabinete)
+            qs_sec_final = Seccoes.objects.filter(
+                departamento=dept,
+            ).exclude(
+                pk=seccao.pk,
+            ).order_by('nome') if dept else Seccoes.objects.none()
         
         seccoes_fixas = False
 
