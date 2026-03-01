@@ -27,19 +27,21 @@
             margin-bottom: 20px;
         }
         .brasao {
-            width: 65px;
-            margin-bottom: 8px;
+            width: 100px; /* Brasão maior (de 65px para 100px) */
+            margin-bottom: 4px; /* Menos margem abaixo do brasão */
         }
         .header h1 {
             font-size: 11pt;
             font-weight: bold;
-            margin: 2px 0;
+            margin: 0; /* Removida margem superior/inferior para aproximar textos */
+            padding: 0;
             text-transform: uppercase;
         }
         .header h2 {
             font-size: 10pt;
             font-weight: bold;
-            margin: 1px 0;
+            margin: 0; /* Removida margem superior/inferior para aproximar textos */
+            padding: 0;
             text-transform: uppercase;
         }
 
@@ -233,19 +235,25 @@
                 <td class="footer-endereco">
                     {% if admin.endereco %}
                         {{ admin.endereco|linebreaksbr }}
+                    {% else %}
+                        Rua do Comércio, Edifício Sede<br>
+                        Centro da Cidade, Província do Uíge<br>
+                        República de Angola
                     {% endif %}
                 </td>
                 <td class="footer-logo">
-                    {% if logo_path %}
-                        <img class="logo-governo" src="{{ logo_path }}">
-                    {% elif brasao_path %}
-                        <img style="width: 40px;" src="{{ brasao_path }}">
-                        <div style="font-size: 8pt; font-weight: bold; margin-top: 2px;">GOVERNO DE ANGOLA</div>
+                    {% if brasao_path %}
+                        <img style="width: 45px;" src="{{ brasao_path }}">
+                        <div style="font-size: 8pt; font-weight: bold; margin-top: 2px;">SIGAP</div>
                     {% endif %}
                 </td>
                 <td class="footer-contacto">
                     {% if admin.contacto %}
                         {{ admin.contacto|linebreaksbr }}
+                    {% else %}
+                        Email: geral@uige.gov.ao<br>
+                        Portal: www.mat.gov.ao<br>
+                        Tel: (+244) 900 000 000
                     {% endif %}
                 </td>
             </tr>

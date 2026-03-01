@@ -29,16 +29,7 @@
             </a>
         </div>
 
-        {% if messages %}
-            <div class="mb-8 space-y-4">
-            {% for message in messages %}
-                <div class="flex items-center gap-3 p-4 bg-emerald-50 text-emerald-700 border-emerald-100 rounded-2xl border font-bold text-sm shadow-sm">
-                    <i data-lucide="check-circle" class="w-5 h-5"></i>
-                    {{ message }}
-                </div>
-            {% endfor %}
-            </div>
-        {% endif %}
+
 
         {% if documento %}
         <!-- Card de Contexto do Documento -->

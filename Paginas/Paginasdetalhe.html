@@ -672,31 +672,7 @@
         });
     </script>
 
-    <!-- Django Messages via Toastify -->
-    {% if messages %}
-    <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        {% for message in messages %}
-        if (typeof Toastify === 'function') {
-            Toastify({
-                text: "{% if message.tags == 'success' %}✅{% elif message.tags == 'error' %}❌{% elif message.tags == 'warning' %}⚠️{% else %}ℹ️{% endif %} {{ message|escapejs }}",
-                duration: 5000,
-                gravity: "top",
-                position: "right",
-                style: {
-                    background: "{% if message.tags == 'success' %}linear-gradient(135deg, #10b981, #059669){% elif message.tags == 'error' %}linear-gradient(135deg, #ef4444, #dc2626){% elif message.tags == 'warning' %}linear-gradient(135deg, #f59e0b, #d97706){% else %}linear-gradient(135deg, #6366f1, #4f46e5){% endif %}",
-                    borderRadius: "16px",
-                    fontWeight: "700",
-                    fontSize: "13px",
-                    padding: "16px 24px",
-                    boxShadow: "0 10px 25px rgba(0,0,0,0.15)"
-                }
-            }).showToast();
-        }
-        {% endfor %}
-    });
-    </script>
-    {% endif %}
+
 
     <!-- AJAX Form Submission (No Page Refresh) -->
     <script>

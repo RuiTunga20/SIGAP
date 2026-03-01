@@ -179,6 +179,14 @@
                 lucide.createIcons();
              }
         });
+
+        // Real-Time Sincronização: escutar o evento disparado por notifications.js p/ recarregar Dashboard
+        window.addEventListener('pendenciasAtualizadas', function(e) {
+            console.log('[Dashboard] Atualização detectada, recarregando contadores em 1.5s...');
+            setTimeout(() => {
+                window.location.reload();
+            }, 1500);
+        });
     </script>
 </body>
 </html>
