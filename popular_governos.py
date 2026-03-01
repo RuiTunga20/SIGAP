@@ -8,6 +8,7 @@ os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'SGA.settings')
 django.setup()
 
 from ARQUIVOS.models import Administracao, Departamento, Seccoes
+from limpar_estrutura_obsoleta import limpar_estrutura
 
 # Definição da Estrutura
 ESTRUTURA_GOVERNO = {
@@ -112,6 +113,7 @@ ESTRUTURA_GOVERNO = {
 }
 
 def popular_governos():
+    limpar_estrutura()
     print("Iniciando população dos Governos Provinciais...")
     
     # Lista Oficial das Províncias de Angola (Nova Divisão)

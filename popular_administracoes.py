@@ -17,6 +17,7 @@ os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'SGA.settings')
 django.setup()
 
 from ARQUIVOS.models import Administracao
+from limpar_estrutura_obsoleta import limpar_estrutura
 
 # =============================================================================
 # TODAS AS 326 ADMINISTRAÇÕES MUNICIPAIS
@@ -186,6 +187,7 @@ ADMINISTRACOES = {
 
 def popular_administracoes():
     """Popula todas as 326 administrações com tipo e província."""
+    limpar_estrutura()
     criadas = 0
     atualizadas = 0
     

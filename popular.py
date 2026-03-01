@@ -18,6 +18,8 @@ except ImportError as e:
     print(f"ERRO: Verifique as importações. Detalhe: {e}")
     exit()
 
+from limpar_estrutura_obsoleta import limpar_estrutura
+
 
 # --- ESTRUTURA COMPLETA COM GABINETES DE DIREÇÃO (A, B, C, D) ---
 
@@ -171,6 +173,7 @@ ESTRUTURA = {
 
 
 def popular_base_de_dados():
+    limpar_estrutura()
     print("--- INICIANDO POVOAMENTO DA ESTRUTURA ADMINISTRATIVA ANGOLANA ---\n")
 
     total_deptos_criados = 0

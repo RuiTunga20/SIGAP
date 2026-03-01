@@ -8,6 +8,7 @@ os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'SGA.settings')
 django.setup()
 
 from ARQUIVOS.models import Administracao, Departamento, Seccoes
+from limpar_estrutura_obsoleta import limpar_estrutura
 
 # Definição da Estrutura do MAT
 ESTRUTURA_MAT = {
@@ -79,6 +80,7 @@ ESTRUTURA_MAT = {
 }
 
 def popular_mat():
+    limpar_estrutura()
     print("Iniciando população do MAT (Ministério da Administração do Território)...")
     
     nome_mat = "Ministério da Administração do Território"

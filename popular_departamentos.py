@@ -16,6 +16,7 @@ os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'SGA.settings')
 django.setup()
 
 from ARQUIVOS.models import Administracao, Departamento, Seccoes
+from limpar_estrutura_obsoleta import limpar_estrutura
 
 # =============================================================================
 # ESTRUTURAS ORGÂNICAS POR TIPO DE MUNICÍPIO
@@ -247,6 +248,7 @@ def popular_departamentos_seccoes():
     Popula os departamentos e secções para todas as administrações
     conforme seu tipo de estrutura orgânica.
     """
+    limpar_estrutura()
     total_departamentos = 0
     total_seccoes = 0
     total_admin = 0

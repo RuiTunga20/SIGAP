@@ -103,6 +103,7 @@ class CustomUser(AbstractUser):
         'ministro', 'secretario_estado',
         'governador', 'vice_governador',
         'admin_municipal', 'admin_adjunto',
+        'diretor_nacional', 'diretor_gabinete', 'diretor_municipal',
     ]
 
     NIVEIS_DIRECAO = [
@@ -212,9 +213,10 @@ class CustomUser(AbstractUser):
         # Automação de Nível de Sigilo baseada no Nível de Acesso
         # Garante que Chefes e Diretores tenham permissão de ver/distribuir documentos
         if self.nivel_acesso in ['admin_sistema', 'ministro', 'governador', 'admin_municipal', 
-                                 'diretor_nacional', 'diretor_gabinete', 'diretor_municipal']:
+                                 'diretor_nacional', 'diretor_gabinete', 'diretor_municipal',
+                                 'secretario_estado', 'vice_governador', 'admin_adjunto']:
             self.nivel_sigilo = 2 # Direção / Alta Gestão
-        elif self.nivel_acesso in ['chefe_departamento', 'chefe_seccao', 'admin_adjunto']:
+        elif self.nivel_acesso in ['chefe_departamento', 'chefe_seccao']:
             self.nivel_sigilo = 1 # Chefia
         elif self.nivel_acesso == 'tecnico':
              # Mantém 0, a menos que tenha sido alterado manualmente (permite override)

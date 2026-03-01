@@ -17,9 +17,11 @@ os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'SGA.settings')
 django.setup()
 
 from ARQUIVOS.models import Administracao, Departamento, Seccoes
+from limpar_estrutura_obsoleta import limpar_estrutura
 
 
 def popular_seccoes_especiais():
+    limpar_estrutura()
     print("=" * 80)
     print("POPULANDO SECÇÕES ESPECIAIS (GABINETES E CARGOS)")
     print("Política Universal: Titular + Assessor + Dir. Gabinete + Secretário(a)")
