@@ -78,9 +78,9 @@
                             <h3 class="text-xs font-black uppercase tracking-widest text-slate-500">Metadados do Documento</h3>
                         </div>
                         {% if documento.arquivo_digitalizado %}
-                            <a href="{% url 'visualizar_arquivo' documento.id 'despacho' %}" class="inline-flex items-center gap-2 px-3 py-1.5 bg-amber-500/10 text-amber-600 hover:bg-amber-500 hover:text-white rounded-lg font-bold text-[11px] transition-all">
-                                <i data-lucide="file-down" class="w-3.5 h-3.5"></i> Baixar Despacho
-                            </a>
+                            <button onclick="openDocViewer('despacho')" class="inline-flex items-center gap-2 px-3 py-1.5 bg-amber-500/10 text-amber-600 hover:bg-amber-500 hover:text-white rounded-lg font-bold text-[11px] transition-all">
+                                <i data-lucide="eye" class="w-3.5 h-3.5"></i> Ver Despacho
+                            </button>
                         {% endif %}
                         {% if documento.arquivo %}
                             <button onclick="openDocViewer()" class="inline-flex items-center gap-2 px-3 py-1.5 bg-sga-blue/10 text-sga-blue hover:bg-sga-blue hover:text-white rounded-lg font-bold text-[11px] transition-all">
@@ -154,8 +154,17 @@
                                     <div class="flex-1">
                                         <div class="flex items-center justify-between mb-2">
                                             <span class="text-sm font-bold text-slate-800">{{ obs.usuario.get_full_name|default:obs.usuario.username }}</span>
-                                            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-tight">
-                                                {{ obs.get_tipo_movimentacao_display }} -
+                                            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-tight flex items-center gap-1.5">
+                                                {% if obs.tipo_movimentacao == 'aprovado' %}
+                                                    <span class="text-emerald-600 flex items-center gap-1"><i data-lucide="check-circle" class="w-3.5 h-3.5"></i> APROVADO</span>
+                                                {% elif obs.tipo_movimentacao == 'reprovado' %}
+                                                    <span class="text-red-600 flex items-center gap-1"><i data-lucide="x-circle" class="w-3.5 h-3.5"></i> REPROVADO</span>
+                                                {% elif obs.tipo_movimentacao == 'arquivado' %}
+                                                    <span class="text-slate-600 flex items-center gap-1"><i data-lucide="archive" class="w-3.5 h-3.5"></i> ARQUIVADO</span>
+                                                {% else %}
+                                                    {{ obs.get_tipo_movimentacao_display }}
+                                                {% endif %}
+                                                -
                                                 {% if obs.usuario.seccao %}
                                                     {{ obs.usuario.seccao.nome }}
                                                 {% elif obs.usuario.departamento %}
@@ -472,7 +481,15 @@
                                     {{ mov.data_movimentacao|date:"d M Y • H:i" }}
                                 </time>
                                 <p class="text-[13px] text-slate-800 leading-tight">
-                                    <span class="font-bold text-sga-red">{{ mov.get_tipo_movimentacao_display }}</span>
+                                    {% if mov.tipo_movimentacao == 'aprovado' %}
+                                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-100 text-emerald-700 rounded-lg text-[10px] font-black uppercase"><i data-lucide="check-circle" class="w-3.5 h-3.5"></i> Aprovado</span>
+                                    {% elif mov.tipo_movimentacao == 'reprovado' %}
+                                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-red-100 text-red-700 rounded-lg text-[10px] font-black uppercase"><i data-lucide="x-circle" class="w-3.5 h-3.5"></i> Reprovado</span>
+                                    {% elif mov.tipo_movimentacao == 'arquivado' %}
+                                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-200 text-slate-700 rounded-lg text-[10px] font-black uppercase"><i data-lucide="archive" class="w-3.5 h-3.5"></i> Arquivado</span>
+                                    {% else %}
+                                        <span class="font-bold text-sga-red">{{ mov.get_tipo_movimentacao_display }}</span>
+                                    {% endif %}
                                     {% if mov.seccao_destino %}
                                         para <span class="font-bold text-slate-600">
                                             {{ mov.seccao_destino.nome }}
@@ -499,7 +516,7 @@
                                 {% if mov.despacho %}
                                 <div class="mt-4 p-3 bg-amber-50/50 border-l-2 border-amber-300 rounded-r-lg text-[11px] text-amber-900 font-medium italic leading-relaxed">
                                     <i data-lucide="pen-tool" class="w-3 h-3 inline-block mr-1 opacity-50"></i>
-                                    {{ mov.despacho|safe }}
+                                        {{ mov.despacho|truncatechars_html:50|safe }}
                                 </div>
                                 {% endif %}
                             </div>
@@ -830,6 +847,11 @@
                 </div>
                 
                 <div class="flex items-center gap-4">
+                    <!-- Download Button -->
+                    <a id="modalDownloadBtn" href="#" download class="p-2 text-slate-400 hover:text-emerald-500 bg-slate-800 hover:bg-emerald-500/20 rounded-xl transition-all border border-slate-700 hover:border-emerald-500/50" title="Baixar Arquivo">
+                        <i data-lucide="download" class="w-6 h-6"></i>
+                    </a>
+
                      <!-- Controles de Zoom -->
                     <div class="flex items-center bg-slate-800 rounded-lg border border-slate-700 p-1">
                         <button onclick="zoomOut()" class="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-md transition-all" title="Diminuir Zoom">
@@ -884,15 +906,29 @@
     <script>
         pdfjsLib.GlobalWorkerOptions.workerSrc = "{% static 'js/pdf.worker.min.js' %}";
         
-        const pdfUrl = "{% url 'visualizar_arquivo' documento.id 'documento' %}";
+        const urlDocumento = "{% url 'visualizar_arquivo' documento.id 'documento' %}";
+        const urlDespacho = "{% if documento.arquivo_digitalizado %}{% url 'visualizar_arquivo' documento.id 'despacho' %}{% else %}#{% endif %}";
+        
+        let currentPdfUrl = urlDocumento;
         let pdfDoc = null;
         let scale = 1.2; // Zoom inicial
         let isRendering = false;
 
-        function openDocViewer() {
+        function openDocViewer(type = 'documento') {
+            const novaUrl = (type === 'despacho') ? urlDespacho : urlDocumento;
+            
+            // Set download link
+            const downloadBtn = document.getElementById('modalDownloadBtn');
+            if (downloadBtn) downloadBtn.href = novaUrl;
+
             document.getElementById('docViewerModal').classList.remove('hidden');
             document.body.style.overflow = 'hidden'; // Lock Body Scroll
-            if (!pdfDoc) {
+            
+            // Se mudou de documento ou ainda não carregou
+            if (currentPdfUrl !== novaUrl || !pdfDoc) {
+                currentPdfUrl = novaUrl;
+                pdfDoc = null;
+                document.getElementById('pdf-pages').innerHTML = ''; // Limpar anterior
                 loadPdf();
             }
         }
@@ -915,7 +951,7 @@
                 loadingEl.classList.remove('hidden');
                 errorEl.classList.add('hidden');
                 
-                const loadingTask = pdfjsLib.getDocument(pdfUrl);
+                const loadingTask = pdfjsLib.getDocument(currentPdfUrl);
                 pdfDoc = await loadingTask.promise;
                 
                 await renderPages();
@@ -983,10 +1019,15 @@
             const viewBtns = document.querySelectorAll('a[href*="visualizar_arquivo"][target="_blank"]');
             viewBtns.forEach(btn => {
                 btn.removeAttribute('target');
+                const href = btn.href;
                 btn.href = 'javascript:void(0)';
                 btn.onclick = (e) => {
                     e.preventDefault();
-                    openDocViewer();
+                    if (href.includes('/despacho')) {
+                        openDocViewer('despacho');
+                    } else {
+                        openDocViewer('documento');
+                    }
                 };
             });
         });

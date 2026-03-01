@@ -862,8 +862,28 @@ def detalhe_documento(request, documento_id):
                 messages.error(request, 'Apenas administradores podem executar esta ação.')
                 return redirect('detalhe_documento', documento_id=documento.id)
 
-            # Criar movimentação de registro
-            MovimentacaoDocumento.objects.create(
+            texto_despacho = f"Documento {action}."
+            
+            # Buscar o último parecer se for aprovado/reprovado para auto-gerar despacho
+            if action in [StatusDocumento.APROVADO, StatusDocumento.REPROVADO]:
+                ultimo_parecer = MovimentacaoDocumento.objects.filter(
+                    documento=documento
+                ).exclude(
+                    tipo_movimentacao__in=[StatusDocumento.APROVADO, StatusDocumento.REPROVADO, StatusDocumento.ARQUIVADO]
+                ).filter(
+                    Q(observacoes__isnull=False) | Q(despacho__isnull=False)
+                ).exclude(
+                    Q(observacoes__exact='') & Q(despacho__exact='')
+                ).order_by('-data_movimentacao').first()
+
+                if ultimo_parecer:
+                    if ultimo_parecer.despacho and str(ultimo_parecer.despacho).strip():
+                        texto_despacho = ultimo_parecer.despacho
+                    elif ultimo_parecer.observacoes and str(ultimo_parecer.observacoes).strip():
+                        texto_despacho = ultimo_parecer.observacoes
+
+            # Criar movimentação de registro configurada para despacho (se aprovado/reprovado)
+            mov_kwargs = dict(
                 documento=documento,
                 tipo_movimentacao=action,
                 seccao_origem=user_seccao,
@@ -871,10 +891,46 @@ def detalhe_documento(request, documento_id):
                 usuario=request.user,
                 observacoes=f'Documento {action} por {request.user.username}'
             )
+            
+            if action in [StatusDocumento.APROVADO, StatusDocumento.REPROVADO]:
+                mov_kwargs['despacho'] = texto_despacho
+                
+            MovimentacaoDocumento.objects.create(**mov_kwargs)
 
             # Atualizar documento e fechar data
             documento.status = action
             documento.data_conclusao = timezone.now()
+
+            # Gerar PDF e notificar por email se for Aprovação/Reprovação
+            if action in [StatusDocumento.APROVADO, StatusDocumento.REPROVADO]:
+                try:
+                    pdf_content = gerar_pdf_despacho(documento, texto_despacho, request.user, action)
+                    documento.arquivo_digitalizado.save(pdf_content.name, pdf_content, save=False)
+                    
+                    if documento.email:
+                        assunto = f"Notificação de Decisão Final - Protocolo {documento.numero_protocolo}"
+                        email_context = {
+                            'utente': documento.utente or "Utente",
+                            'protocolo': documento.numero_protocolo,
+                            'titulo': documento.titulo,
+                            'status': documento.get_status_display(),
+                            'administracao': request.user.administracao.nome if request.user.administracao else 'Administração SIGAP',
+                            'ano': timezone.now().year
+                        }
+                        mensagem_html = render_to_string('emails/despacho_email.html', email_context)
+                        email_msg = EmailMessage(
+                            assunto,
+                            mensagem_html,
+                            None,
+                            [documento.email]
+                        )
+                        email_msg.content_subtype = "html"
+                        pdf_content.seek(0)
+                        email_msg.attach(pdf_content.name, pdf_content.read(), 'application/pdf')
+                        email_msg.send(fail_silently=False)
+                except Exception as e:
+                    print(f"Erro auto-gerando PDF/Email: {e}")
+
             documento.save()
 
             msg = f'Documento {action} com sucesso!'
