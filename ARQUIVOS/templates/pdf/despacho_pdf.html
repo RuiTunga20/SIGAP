@@ -210,15 +210,19 @@
         {{ data_texto }}
     </div>
 
-    <!-- ASSINATURA -->
+    <!-- AUTENTICAÇÃO DIGITAL (QR CODE) -->
     <div class="assinatura-bloco">
         <div class="cargo">{{ cargo_texto }}</div>
-        <div class="assinatura-linha-wrapper">
-            <table>
-                <tr>
-                    <td>{{ nome_responsavel|upper }}</td>
-                </tr>
-            </table>
+        <div style="margin-top: 15px; text-align: center;">
+            {% if qr_base64 %}
+                <img src="data:image/png;base64,{{ qr_base64 }}" style="width: 120px; height: 120px; margin: 0 auto;">
+            {% endif %}
+        </div>
+        <div style="margin-top: 8px; font-size: 8pt; color: #555; text-align: center;">
+            Autenticado digitalmente via Código QR
+        </div>
+        <div style="margin-top: 2px; font-size: 7pt; color: #888; text-align: center;">
+            {{ nome_responsavel|upper }}
         </div>
     </div>
 

@@ -807,7 +807,7 @@ def detalhe_documento(request, documento_id):
                 # --- GERAÇÃO DE PDF E ENVIO DE EMAIL ---
                 try:
                     # 1. Gerar PDF
-                    pdf_content = gerar_pdf_despacho(documento, texto_despacho, request.user, novo_status)
+                    pdf_content = gerar_pdf_despacho(documento, texto_despacho, request.user, novo_status, request=request)
                     
                     # 2. Salvar no campo 'arquivo_digitalizado'
                     # Nota: Isso sobrescreve o arquivo anterior se existir, conforme solicitado
@@ -904,7 +904,7 @@ def detalhe_documento(request, documento_id):
             # Gerar PDF e notificar por email se for Aprovação/Reprovação
             if action in [StatusDocumento.APROVADO, StatusDocumento.REPROVADO]:
                 try:
-                    pdf_content = gerar_pdf_despacho(documento, texto_despacho, request.user, action)
+                    pdf_content = gerar_pdf_despacho(documento, texto_despacho, request.user, action, request=request)
                     documento.arquivo_digitalizado.save(pdf_content.name, pdf_content, save=False)
                     
                     if documento.email:
@@ -2126,4 +2126,49 @@ def visualizar_arquivo(request, documento_id, tipo):
         # Despacho: Permite download
         response['Content-Disposition'] = f'attachment; filename="{nome_arquivo}"'
     
+    return response
+
+
+def verificar_despacho(request, token):
+    """
+    Vista pública para verificação de autenticidade de despachos via QR Code.
+    Utiliza token UUID seguro (não adivinhável).
+    Exibe detalhes básicos do documento e permite o download do PDF.
+    """
+    from django.shortcuts import get_object_or_404, render
+    from ARQUIVOS.models.documento import Documento
+    
+    documento = get_object_or_404(Documento, token_verificacao=token)
+    
+    contexto = {
+        'documento': documento,
+        'admin': documento.administracao,
+        'token': token,
+    }
+    
+    return render(request, 'pdf/verificar_despacho.html', contexto)
+
+
+def download_despacho_publico(request, token):
+    """
+    Vista pública para download do PDF de despacho por token.
+    Não exige login — acessível pelo utente via QR Code.
+    """
+    import mimetypes
+    from django.shortcuts import get_object_or_404
+    from django.http import FileResponse, Http404
+    from ARQUIVOS.models.documento import Documento
+    
+    documento = get_object_or_404(Documento, token_verificacao=token)
+    
+    if not documento.arquivo_digitalizado:
+        raise Http404("Despacho não encontrado")
+    
+    nome_arquivo = os.path.basename(documento.arquivo_digitalizado.name)
+    content_type, _ = mimetypes.guess_type(nome_arquivo)
+    if not content_type:
+        content_type = 'application/pdf'
+    
+    response = FileResponse(documento.arquivo_digitalizado.open('rb'), content_type=content_type)
+    response['Content-Disposition'] = f'inline; filename="{nome_arquivo}"'
     return response

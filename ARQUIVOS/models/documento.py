@@ -1,4 +1,5 @@
 from django.db import models
+import uuid
 from tinymce.models import HTMLField
 from django.conf import settings
 from django.core.validators import RegexValidator, FileExtensionValidator
@@ -59,6 +60,12 @@ class Documento(SoftDeleteModel, AuditoriaModel):
     ]
     objects = DocumentoManager()
 
+    token_verificacao = models.UUIDField(
+        default=uuid.uuid4,
+        editable=False,
+        unique=True,
+        help_text="Token único para verificação pública via QR Code"
+    )
     numero_protocolo = models.CharField(max_length=20, unique=True, editable=False)
     titulo = models.CharField('Assunto', max_length=200)
     conteudo = models.TextField(blank=True, null=True)

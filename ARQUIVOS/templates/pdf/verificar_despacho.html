@@ -1,0 +1,83 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-BR" class="h-full bg-slate-50">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verificação de Documento - SIGAP</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="h-full bg-slate-100">
+
+    <!-- CABEÇALHO -->
+    <header class="bg-slate-900 border-b border-slate-700 px-6 py-4">
+        <div class="max-w-3xl mx-auto flex flex-col sm:flex-row items-center justify-between">
+            <div class="flex items-center gap-4">
+                <div class="bg-emerald-500/10 border border-emerald-500/20 rounded-full p-2">
+                    <svg class="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="text-white font-bold text-sm">Documento Autêntico</h1>
+                    <p class="text-slate-400 text-[10px] uppercase font-bold tracking-widest">Estado Angolano — Verificação Digital</p>
+                </div>
+            </div>
+            <div class="mt-4 sm:mt-0">
+                <h1 class="text-white font-black text-xl tracking-tight">SIGAP</h1>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div class="bg-white shadow-xl rounded-2xl overflow-hidden border border-slate-200">
+            <!-- Cabeçalho do Card -->
+            <div class="bg-slate-900 px-6 py-5">
+                <h2 class="text-white font-bold text-sm">Detalhes do Documento</h2>
+                <p class="text-slate-400 text-[10px] uppercase font-bold tracking-widest mt-1">Informações de verificação</p>
+            </div>
+            
+            <!-- Corpo do Card com Espaçamento Reduzido -->
+            <div class="p-6 space-y-4">
+                <div>
+                    <p class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-0.5">Nº Ref. do Documento</p>
+                    <p class="text-lg font-bold text-slate-900">{{ documento.numero_protocolo }}</p>
+                </div>
+                <div>
+                    <p class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-0.5">Título / Assunto</p>
+                    <p class="text-base font-bold text-slate-900">{{ documento.titulo }}</p>
+                </div>
+                <div>
+                    <p class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-0.5">Nome do Utente / Requerente</p>
+                    <p class="text-base font-bold text-slate-900">{{ documento.utente|default:"N/A" }}</p>
+                </div>
+                <div>
+                    <p class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-0.5">Domicílio de Emissão</p>
+                    <p class="text-base font-bold text-slate-900">{{ admin.nome }}</p>
+                </div>
+                <div>
+                    <p class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-0.5">Data de Emissão</p>
+                    <p class="text-base font-bold text-slate-900">{{ documento.data_ultima_movimentacao|date:"d-m-Y" }}</p>
+                </div>
+            </div>
+
+            <!-- Rodapé com Botões -->
+            <div class="px-6 py-5 bg-slate-50 border-t border-slate-100 flex flex-col sm:flex-row gap-3">
+                {% if documento.arquivo_digitalizado %}
+                <a href="{% url 'download_despacho_publico' token %}" download class="w-full inline-flex items-center justify-center px-5 py-2.5 rounded-xl bg-slate-900 text-white font-bold text-sm hover:bg-slate-800 transition-all shadow-md">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    Baixar Despacho
+                </a>
+                {% endif %}
+                <a href="{% url 'login' %}" class="w-full inline-flex items-center justify-center px-5 py-2.5 rounded-xl bg-white border border-slate-300 text-slate-700 font-bold text-sm hover:bg-slate-50 transition-all">
+                    Aceder ao Sistema
+                </a>
+            </div>
+            
+        </div>
+    </main>
+
+</body>
+</html>

@@ -68,6 +68,10 @@ path('notificacoes/marcar-como-lidas/', views.marcar_notificacoes_como_lidas, na
     path('administracao/usuarios/excluir/<int:usuario_id>/', views.excluir_usuario, name='excluir_usuario'),
     path('ajax/seccoes-departamento/', views.ajax_seccoes_departamento, name='ajax_seccoes_departamento'),
 
+    # Verificação de Despacho (Pública - Token UUID seguro)
+    path('verificar-despacho/<uuid:token>/', views.verificar_despacho, name='verificar_despacho'),
+    path('verificar-despacho/<uuid:token>/download/', views.download_despacho_publico, name='download_despacho_publico'),
+
 ]
 
 # Servir arquivos media e static

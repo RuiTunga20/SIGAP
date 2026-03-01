@@ -1,5 +1,6 @@
 import io
 import os
+import base64
 from django.core.files.base import ContentFile
 from django.conf import settings
 from reportlab.lib.pagesizes import A4
@@ -12,6 +13,7 @@ from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY, TA_LEFT
 from django.utils import timezone
 from django.template.loader import render_to_string
 from xhtml2pdf import pisa
+import qrcode
 
 
 def _obter_caminho_brasao():
@@ -107,10 +109,10 @@ def _construir_cabecalho(admin, usuario=None):
     return linhas
 
 
-def gerar_pdf_despacho(documento, texto_despacho, usuario_responsavel, novo_status):
+def gerar_pdf_despacho(documento, texto_despacho, usuario_responsavel, novo_status, request=None):
     """
     Gera um PDF de despacho usando xhtml2pdf (HTML to PDF).
-    Isso permite melhor suporte para o conteúdo vindo do TinyMCE.
+    Inclui um código QR de verificação em vez da assinatura tradicional.
     """
     admin = documento.administracao
     brasao_path = _obter_caminho_brasao()
@@ -132,6 +134,28 @@ def gerar_pdf_despacho(documento, texto_despacho, usuario_responsavel, novo_stat
         dept_nome = usuario_responsavel.departamento_efetivo.nome
     cargo_texto = dept_nome.upper() if dept_nome else "A SECRETÁRIA GERAL"
     
+    # Gerar QR Code de verificação
+    qr_base64 = None
+    url_verificacao = ''
+    if request:
+        from django.urls import reverse
+        url_verificacao = request.build_absolute_uri(
+            reverse('verificar_despacho', args=[str(documento.token_verificacao)])
+        )
+    else:
+        url_verificacao = f'/verificar-despacho/{documento.token_verificacao}/'
+    
+    # Gerar imagem QR Code
+    qr = qrcode.QRCode(version=1, box_size=10, border=2)
+    qr.add_data(url_verificacao)
+    qr.make(fit=True)
+    qr_img = qr.make_image(fill_color='black', back_color='white')
+    
+    qr_buffer = io.BytesIO()
+    qr_img.save(qr_buffer, format='PNG')
+    qr_buffer.seek(0)
+    qr_base64 = base64.b64encode(qr_buffer.getvalue()).decode('utf-8')
+    
     # Contexto para o template
     contexto = {
         'documento': documento,
@@ -143,6 +167,8 @@ def gerar_pdf_despacho(documento, texto_despacho, usuario_responsavel, novo_stat
         'logo_path': logo_path,
         'linhas_cabecalho': linhas_cabecalho,
         'data_texto': data_texto,
+        'qr_base64': qr_base64,
+        'url_verificacao': url_verificacao,
     }
     
     # Renderizar HTML
