@@ -24,24 +24,26 @@
         /* CABEÇALHO */
         .header {
             text-align: center;
-            margin-bottom: 20px;
+            margin-bottom: 25px; /* Reduzido de 20 para ter menos distância com o destinatário */
         }
         .brasao {
-            width: 100px; /* Brasão maior (de 65px para 100px) */
-            margin-bottom: 4px; /* Menos margem abaixo do brasão */
+            width: 100px;
+            margin-bottom: -15px; /* Margem negativa para unir a insígnia com os textos */
         }
         .header h1 {
             font-size: 11pt;
             font-weight: bold;
-            margin: 0; /* Removida margem superior/inferior para aproximar textos */
+            margin: 0;
             padding: 0;
+            line-height: 0.9; /* Forçar sobreposição leve para diminuir espaço */
             text-transform: uppercase;
         }
         .header h2 {
             font-size: 10pt;
             font-weight: bold;
-            margin: 0; /* Removida margem superior/inferior para aproximar textos */
+            margin: 0;
             padding: 0;
+            line-height: 0.9;
             text-transform: uppercase;
         }
 
@@ -242,9 +244,11 @@
                     {% endif %}
                 </td>
                 <td class="footer-logo">
-                    {% if brasao_path %}
-                        <img style="width: 45px;" src="{{ brasao_path }}">
-                        <div style="font-size: 8pt; font-weight: bold; margin-top: 2px;">SIGAP</div>
+                    {% if logo_path %}
+                        <img class="logo-governo" src="{{ logo_path }}">
+                    {% elif brasao_path %}
+                        <img style="width: 40px;" src="{{ brasao_path }}">
+                        <div style="font-size: 8pt; font-weight: bold; margin-top: 2px;">GOVERNO DE ANGOLA</div>
                     {% endif %}
                 </td>
                 <td class="footer-contacto">
