@@ -72,6 +72,13 @@ path('notificacoes/marcar-como-lidas/', views.marcar_notificacoes_como_lidas, na
     path('verificar-despacho/<uuid:token>/', views.verificar_despacho, name='verificar_despacho'),
     path('verificar-despacho/<uuid:token>/download/', views.download_despacho_publico, name='download_despacho_publico'),
 
+    # API de Sincronização (Online/Offline)
+    path('api/sync/push/', __import__('ARQUIVOS.sync_views', fromlist=['sync_push']).sync_push, name='sync_push'),
+    path('api/sync/pull/', __import__('ARQUIVOS.sync_views', fromlist=['sync_pull']).sync_pull, name='sync_pull'),
+    path('api/sync/status/', __import__('ARQUIVOS.sync_views', fromlist=['sync_status']).sync_status, name='sync_status'),
+
+    # Sincronização Manual (Interface Gráfica)
+    path('sincronizacao/', __import__('ARQUIVOS.sync_views', fromlist=['painel_sincronizacao']).painel_sincronizacao, name='painel_sincronizacao'),
 ]
 
 # Servir arquivos media e static

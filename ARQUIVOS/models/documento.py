@@ -6,7 +6,7 @@ from django.core.validators import RegexValidator, FileExtensionValidator
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 from ARQUIVOS.managers import DocumentoManager
-from ARQUIVOS.models.mixins import SoftDeleteModel, AuditoriaModel
+from ARQUIVOS.models.mixins import SoftDeleteModel, AuditoriaModel, SyncMixin
 
 class TipoDocumento(models.Model):
     """
@@ -35,7 +35,7 @@ class StatusDocumento(models.TextChoices):
     ARQUIVADO = 'arquivado', 'Arquivado'
 
 
-class Documento(SoftDeleteModel, AuditoriaModel):
+class Documento(SoftDeleteModel, AuditoriaModel, SyncMixin):
     """
     Modelo principal para documentos
     """

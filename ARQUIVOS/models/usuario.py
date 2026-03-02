@@ -2,8 +2,9 @@ from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.core.exceptions import ValidationError
 from ARQUIVOS.managers import AdministracaoManager, UsuarioManager
+from ARQUIVOS.models.mixins import SyncMixin
 
-class Administracao(models.Model):
+class Administracao(SyncMixin):
     TIPO_MUNICIPIO_CHOICES = [
         ('A', 'Tipo A'),
         ('B', 'Tipo B'),

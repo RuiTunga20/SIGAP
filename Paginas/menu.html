@@ -64,10 +64,17 @@
                 <a href="{% url 'pendencias' %}" class="px-4 py-2 text-sm font-semibold text-slate-600 hover:text-sga-red hover:bg-slate-50 rounded-lg transition-all">Pendentes</a>
                 <a href="{% url 'arquivo_morto' %}" class="px-4 py-2 text-sm font-semibold text-slate-600 hover:text-sga-red hover:bg-slate-50 rounded-lg transition-all">Arquivo Morto</a>
                 <a href="{% url 'listar_armazenamentos' %}" class="px-4 py-2 text-sm font-semibold text-slate-600 hover:text-sga-red hover:bg-slate-50 rounded-lg transition-all">Armazenamento</a>
+                <a href="{% url 'painel_sincronizacao' %}" class="px-4 py-2 text-sm font-semibold text-slate-600 hover:text-sga-red hover:bg-slate-50 rounded-lg transition-all">Sincronização</a>
             </nav>
 
             <!-- Actions Area -->
             <div class="flex items-center gap-3">
+
+                <!-- Indicador de Conexão (Online/Offline) -->
+                <div id="syncIndicator" class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg transition-all cursor-default" title="Estado da conexão">
+                    <span id="syncDot" class="w-2 h-2 rounded-full bg-slate-300 animate-pulse"></span>
+                    <span id="syncLabel" class="text-[10px] font-bold uppercase tracking-widest text-slate-400">A verificar...</span>
+                </div>
                 
                 {% if user.is_authenticated %}
                     <!-- Notifications -->
@@ -223,6 +230,9 @@
             <a href="{% url 'listar_armazenamentos' %}" class="flex items-center gap-3 px-4 py-3 text-sm font-bold text-slate-600 hover:text-sga-red hover:bg-slate-50 rounded-xl transition-all">
                 <i data-lucide="box" class="w-5 h-5"></i> Armazenamento
             </a>
+            <a href="{% url 'painel_sincronizacao' %}" class="flex items-center gap-3 px-4 py-3 text-sm font-bold text-slate-600 hover:text-sga-red hover:bg-slate-50 rounded-xl transition-all">
+                <i data-lucide="refresh-cw" class="w-5 h-5"></i> Sincronização
+            </a>
         </nav>
     </div>
 </header>
@@ -266,9 +276,77 @@
         csrfToken: '{{ csrf_token }}',
         markReadUrl: "{% url 'marcar_notificacoes_lidas' %}",
         checkNotificationsUrl: "{% url 'verificar_notificacoes' %}",
+        syncStatusUrl: "/api/sync/status/",
         wsUrl: (window.location.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + window.location.host + '/ws/notificacoes/',
         isAuthenticated: {{ user.is_authenticated|yesno:"true,false" }}
     };
+</script>
+
+<!-- Script de verificação de conectividade -->
+<script>
+(function() {
+    const POLL_INTERVAL = 15000; // 15 segundos
+    let wasOffline = false;
+
+    function updateIndicator(online) {
+        const dot = document.getElementById('syncDot');
+        const label = document.getElementById('syncLabel');
+        const indicator = document.getElementById('syncIndicator');
+        if (!dot || !label || !indicator) return;
+
+        if (online) {
+            dot.className = 'w-2 h-2 rounded-full bg-emerald-500';
+            label.textContent = 'Online';
+            label.className = 'text-[10px] font-bold uppercase tracking-widest text-emerald-600';
+            indicator.className = 'flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-emerald-50 border border-emerald-100 transition-all cursor-default';
+
+            if (wasOffline) {
+                // Mostrar toast de reconexão
+                if (window.Toastify) {
+                    Toastify({
+                        text: "🟢 Conexão restabelecida! A sincronizar dados...",
+                        duration: 5000,
+                        gravity: "top",
+                        position: "center",
+                        style: {
+                            background: "#22c55e",
+                            borderRadius: "12px",
+                            fontWeight: "600",
+                        }
+                    }).showToast();
+                }
+                wasOffline = false;
+            }
+        } else {
+            dot.className = 'w-2 h-2 rounded-full bg-red-500 animate-pulse';
+            label.textContent = 'Offline';
+            label.className = 'text-[10px] font-bold uppercase tracking-widest text-red-600';
+            indicator.className = 'flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-red-50 border border-red-100 transition-all cursor-default';
+            wasOffline = true;
+        }
+    }
+
+    function checkConnection() {
+        const url = (window.SGA_CONFIG && window.SGA_CONFIG.syncStatusUrl) || '/api/sync/status/';
+        fetch(url, { method: 'GET', cache: 'no-store' })
+            .then(function(resp) {
+                updateIndicator(resp.ok);
+            })
+            .catch(function() {
+                updateIndicator(false);
+            });
+    }
+
+    // Verificar rede do navegador
+    window.addEventListener('online', function() { checkConnection(); });
+    window.addEventListener('offline', function() { updateIndicator(false); });
+
+    // Poll periódico
+    document.addEventListener('DOMContentLoaded', function() {
+        checkConnection();
+        setInterval(checkConnection, POLL_INTERVAL);
+    });
+})();
 </script>
 <script src="{% static 'js/main.js' %}"></script>
 <script src="{% static 'js/notifications.js' %}"></script>

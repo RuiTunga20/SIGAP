@@ -2,8 +2,9 @@ from django.db import models
 from tinymce.models import HTMLField
 from django.conf import settings
 from django.core.exceptions import ValidationError
+from ARQUIVOS.models.mixins import SyncMixin
 
-class MovimentacaoDocumento(models.Model):
+class MovimentacaoDocumento(SyncMixin):
     TIPO_MOVIMENTACAO_CHOICES = [
         ('criacao', 'Criação'),
         ('recebimento', 'Recebimento'),
@@ -61,6 +62,29 @@ class MovimentacaoDocumento(models.Model):
         null=True,
         blank=True,
         related_name='confirmacoes_movimentacao'
+    )
+
+    # ===== CAMPOS DE SINCRONIZAÇÃO OFFLINE =====
+    ESTADO_SYNC_CHOICES = [
+        ('local', 'Criado Localmente'),
+        ('pendente', 'Pendente de Sincronização'),
+        ('sincronizado', 'Sincronizado'),
+    ]
+
+    via_sincronizacao = models.BooleanField(
+        default=False,
+        help_text="Indica se esta movimentação foi importada via sincronização offline"
+    )
+    estado_sync = models.CharField(
+        max_length=20,
+        choices=ESTADO_SYNC_CHOICES,
+        default='sincronizado',
+        help_text="Estado de sincronização: local (criado offline), pendente (aguarda sync), sincronizado (já propagado)"
+    )
+    sync_id = models.UUIDField(
+        null=True,
+        blank=True,
+        help_text="UUID único para identificar a movimentação entre instâncias durante sincronização"
     )
 
     def clean(self):

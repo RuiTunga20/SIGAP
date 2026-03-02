@@ -1,3 +1,4 @@
+from .mixins import SyncMixin
 from .sistema import ConfiguracaoSistema, Notificacao
 from .organizacao import Departamento, Seccoes
 from .usuario import Administracao, CustomUser, GovernoProvincial, AdministracaoMunicipal, Ministerio

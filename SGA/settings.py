@@ -104,16 +104,28 @@ ASGI_APPLICATION = 'SGA.asgi.application'
 # =============================================================================
 
 # Redis URL para Channel Layer
-REDIS_URL = os.environ.get('REDIS_URL', 'redis://redis:6379/0')
+REDIS_URL = os.environ.get('REDIS_URL')
 
-CHANNEL_LAYERS = {
-    "default": {
-        "BACKEND": "channels_redis.core.RedisChannelLayer",
-        "CONFIG": {
-            "hosts": [REDIS_URL,],
+if REDIS_URL:
+    # Produção (Render) ou Docker local (via docker-compose)
+    CHANNEL_LAYERS = {
+        "default": {
+            "BACKEND": "channels_redis.core.RedisChannelLayer",
+            "CONFIG": {
+                "hosts": [REDIS_URL,],
+            },
         },
-    },
-}
+    }
+else:
+    # Fallback local (sem Docker) — Redis localmente instalado
+    CHANNEL_LAYERS = {
+        "default": {
+            "BACKEND": "channels_redis.core.RedisChannelLayer",
+            "CONFIG": {
+                "hosts": ['redis://127.0.0.1:6379/0'],
+            },
+        },
+    }
 
 # Fallback para desenvolvimento sem Redis
 
@@ -243,3 +255,37 @@ EMAIL_HOST_PASSWORD = '@10102015Rt@'
 
 # E-mail que aparecerá como remetente nas notificações
 DEFAULT_FROM_EMAIL = 'SIGAP <noreply@sigap.gov>'
+
+
+# =============================================================================
+# SINCRONIZAÇÃO ONLINE/OFFLINE
+# =============================================================================
+
+# URL do servidor central (mestre) para sincronização
+SYNC_CENTRAL_URL = os.environ.get('SYNC_CENTRAL_URL', '')
+
+# Token de autenticação para a API de sincronização
+SYNC_AUTH_TOKEN = os.environ.get('SYNC_AUTH_TOKEN', '')
+
+# Identificador desta instância local (gerado automaticamente se vazio)
+import socket
+SYNC_INSTANCE_ID = os.environ.get('SYNC_INSTANCE_ID', socket.gethostname())
+
+# Modelos a sincronizar (ordem importa: dependências primeiro)
+SYNC_MODELS = [
+    'ARQUIVOS.Administracao',
+    'ARQUIVOS.Departamento',
+    'ARQUIVOS.Seccoes',
+    'ARQUIVOS.TipoDocumento',
+    'ARQUIVOS.Documento',
+    'ARQUIVOS.MovimentacaoDocumento',
+    'ARQUIVOS.Anexo',
+    'ARQUIVOS.Notificacao',
+]
+
+# Tamanho do lote para envio/recebimento
+SYNC_BATCH_SIZE = int(os.environ.get('SYNC_BATCH_SIZE', '100'))
+
+# Intervalo entre tentativas de sincronização automática (segundos)
+SYNC_INTERVAL_SECONDS = int(os.environ.get('SYNC_INTERVAL_SECONDS', '60'))
+

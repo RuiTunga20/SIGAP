@@ -2,8 +2,9 @@ from django.db import models
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from ARQUIVOS.managers import DepartamentoManager
+from ARQUIVOS.models.mixins import SyncMixin
 
-class Departamento(models.Model):
+class Departamento(SyncMixin):
     """
     Modelo para representar departamentos da organização.
     """
@@ -62,7 +63,7 @@ class Departamento(models.Model):
         unique_together = [('nome', 'administracao')]
 
 
-class Seccoes(models.Model):
+class Seccoes(SyncMixin):
     departamento = models.ForeignKey(Departamento, on_delete=models.CASCADE)
     nome = models.CharField(max_length=255, unique=False)
     codigo = models.CharField(max_length=20, unique=False, blank=True)

@@ -35,3 +35,39 @@ class AuditoriaModel(models.Model):
     
     class Meta:
         abstract = True
+
+
+import uuid
+
+class SyncMixin(models.Model):
+    """
+    Mixin para sincronização online/offline.
+    Adiciona um UUID global (para evitar colisões de PK entre instâncias),
+    um flag de sincronização pendente e um timestamp de última sincronização.
+    """
+    uuid_sinc = models.UUIDField(
+        default=uuid.uuid4,
+        editable=False,
+        unique=True,
+        db_index=True,
+        help_text="Identificador universal para sincronização entre instâncias"
+    )
+    pendente_sinc = models.BooleanField(
+        default=True,
+        db_index=True,
+        help_text="True se este registo ainda não foi sincronizado com o servidor central"
+    )
+    ultima_sincronizacao = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Última vez que este registo foi sincronizado"
+    )
+    origem_instancia = models.CharField(
+        max_length=100,
+        blank=True,
+        default='',
+        help_text="Identificador da instância que criou este registo (ex: 'admin_municipal_cabinda')"
+    )
+
+    class Meta:
+        abstract = True
