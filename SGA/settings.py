@@ -247,14 +247,15 @@ if DEBUG:
 # Localmente (DEBUG=True), podemos usar o console backend para testar sem enviar emails reais
 
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST =  'smtp.gmail.com'
-EMAIL_PORT = 587
-EMAIL_USE_TLS = True
-EMAIL_HOST_USER = 'ruitunga20@gmail.com'
-EMAIL_HOST_PASSWORD = '@10102015Rt@'
+EMAIL_HOST =  os.environ.get('EMAIL_HOST', 'mail.bryzzafood.com')
+EMAIL_PORT = int(os.environ.get('EMAIL_PORT', 465))
+EMAIL_USE_SSL = os.environ.get('EMAIL_USE_SSL', 'True').lower() == 'true'
+EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'False').lower() == 'true'
+EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', 'sigap@bryzzafood.com')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '@Sigap2026@')
 
 # E-mail que aparecerá como remetente nas notificações
-DEFAULT_FROM_EMAIL = 'SIGAP <noreply@sigap.gov>'
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'SIGAP <sigap@bryzzafood.com>')
 
 
 # =============================================================================
