@@ -1,0 +1,308 @@
+"""
+Management command para sincronizar dados entre instância local e servidor central.
+
+Uso:
+    python manage.py sync_data              # Sincroniza tudo (push + pull)
+    python manage.py sync_data --push       # Apenas envia dados locais
+    python manage.py sync_data --pull       # Apenas recebe dados do servidor
+    python manage.py sync_data --status     # Mostra estado de sincronização
+    python manage.py sync_data --daemon     # Executa continuamente em background
+"""
+import json
+import time
+import logging
+import requests
+from datetime import datetime
+
+from django.core.management.base import BaseCommand, CommandError
+from django.conf import settings
+from django.apps import apps
+from django.core.serializers import serialize, deserialize
+from django.utils import timezone
+from django.db import transaction
+
+logger = logging.getLogger('sync')
+
+
+class Command(BaseCommand):
+    help = 'Sincroniza dados entre a instância local e o servidor central'
+
+    def add_arguments(self, parser):
+        parser.add_argument(
+            '--push', action='store_true',
+            help='Apenas enviar dados locais para o servidor central'
+        )
+        parser.add_argument(
+            '--pull', action='store_true',
+            help='Apenas receber dados do servidor central'
+        )
+        parser.add_argument(
+            '--status', action='store_true',
+            help='Mostrar estado actual de sincronização'
+        )
+        parser.add_argument(
+            '--daemon', action='store_true',
+            help='Executar continuamente em segundo plano'
+        )
+
+    def handle(self, *args, **options):
+        self.central_url = settings.SYNC_CENTRAL_URL
+        self.auth_token = settings.SYNC_AUTH_TOKEN
+        self.instance_id = settings.SYNC_INSTANCE_ID
+        self.batch_size = settings.SYNC_BATCH_SIZE
+
+        if options['status']:
+            self._show_status()
+            return
+
+        if not self.central_url:
+            self.stdout.write(self.style.WARNING(
+                '⚠ SYNC_CENTRAL_URL não configurada. '
+                'A sincronização será registada localmente mas não será enviada.'
+            ))
+
+        if options['daemon']:
+            self._run_daemon()
+            return
+
+        # Sincronização única
+        if options['push']:
+            self._push_data()
+        elif options['pull']:
+            self._pull_data()
+        else:
+            # Push + Pull (sync completo)
+            self._push_data()
+            self._pull_data()
+
+    def _show_status(self):
+        """Mostra quantos registos estão pendentes de sincronização."""
+        self.stdout.write(self.style.HTTP_INFO('\n📊 Estado de Sincronização'))
+        self.stdout.write(f'   Instância: {self.instance_id}')
+        self.stdout.write(f'   Servidor Central: {self.central_url or "(não configurado)"}')
+        self.stdout.write('')
+
+        total_pendentes = 0
+        for model_path in settings.SYNC_MODELS:
+            try:
+                model = apps.get_model(model_path)
+                # Verificar se o modelo tem os campos de sincronização
+                if not hasattr(model, 'pendente_sinc'):
+                    self.stdout.write(f'   ⏭ {model_path}: sem campos de sincronização')
+                    continue
+
+                pendentes = model.objects.filter(pendente_sinc=True).count()
+                total = model.objects.count()
+                total_pendentes += pendentes
+
+                if pendentes > 0:
+                    self.stdout.write(
+                        self.style.WARNING(f'   🔄 {model_path}: {pendentes}/{total} pendentes')
+                    )
+                else:
+                    self.stdout.write(
+                        self.style.SUCCESS(f'   ✅ {model_path}: {total} registos sincronizados')
+                    )
+            except LookupError:
+                self.stdout.write(self.style.ERROR(f'   ❌ {model_path}: modelo não encontrado'))
+
+        self.stdout.write('')
+        if total_pendentes > 0:
+            self.stdout.write(self.style.WARNING(
+                f'   📤 Total pendente: {total_pendentes} registos aguardando envio'
+            ))
+        else:
+            self.stdout.write(self.style.SUCCESS('   ✅ Tudo sincronizado!'))
+        self.stdout.write('')
+
+    def _push_data(self):
+        """Envia registos pendentes para o servidor central."""
+        self.stdout.write(self.style.HTTP_INFO('\n📤 A enviar dados para o servidor central...'))
+
+        if not self.central_url:
+            self.stdout.write(self.style.WARNING(
+                '   ⚠ Servidor central não configurado. Registos ficam marcados como pendentes.'
+            ))
+            return
+
+        for model_path in settings.SYNC_MODELS:
+            try:
+                model = apps.get_model(model_path)
+                if not hasattr(model, 'pendente_sinc'):
+                    continue
+
+                pendentes = model.objects.filter(pendente_sinc=True)[:self.batch_size]
+                count = pendentes.count()
+
+                if count == 0:
+                    continue
+
+                self.stdout.write(f'   📦 {model_path}: a enviar {count} registos...')
+
+                # Serializar para JSON
+                data = serialize('json', pendentes, use_natural_primary_keys=False)
+
+                try:
+                    response = requests.post(
+                        f'{self.central_url}/api/sync/push/',
+                        json={
+                            'instance_id': self.instance_id,
+                            'model': model_path,
+                            'data': data,
+                        },
+                        headers={
+                            'Authorization': f'Token {self.auth_token}',
+                            'Content-Type': 'application/json',
+                        },
+                        timeout=30,
+                    )
+
+                    if response.status_code == 200:
+                        result = response.json()
+                        # Marcar como sincronizados
+                        synced_uuids = result.get('synced_uuids', [])
+                        now = timezone.now()
+                        model.objects.filter(
+                            uuid_sinc__in=synced_uuids
+                        ).update(
+                            pendente_sinc=False,
+                            ultima_sincronizacao=now,
+                        )
+                        self.stdout.write(self.style.SUCCESS(
+                            f'   ✅ {model_path}: {len(synced_uuids)} sincronizados'
+                        ))
+                    else:
+                        self.stdout.write(self.style.ERROR(
+                            f'   ❌ {model_path}: erro HTTP {response.status_code}'
+                        ))
+
+                except requests.ConnectionError:
+                    self.stdout.write(self.style.ERROR(
+                        f'   ❌ Sem conexão com o servidor central'
+                    ))
+                    return  # Parar todo o push se não há ligação
+                except requests.Timeout:
+                    self.stdout.write(self.style.ERROR(
+                        f'   ⏱ Timeout ao enviar {model_path}'
+                    ))
+
+            except LookupError:
+                self.stdout.write(self.style.ERROR(f'   ❌ Modelo {model_path} não encontrado'))
+
+    def _pull_data(self):
+        """Recebe registos novos/actualizados do servidor central."""
+        self.stdout.write(self.style.HTTP_INFO('\n📥 A receber dados do servidor central...'))
+
+        if not self.central_url:
+            self.stdout.write(self.style.WARNING(
+                '   ⚠ Servidor central não configurado.'
+            ))
+            return
+
+        for model_path in settings.SYNC_MODELS:
+            try:
+                model = apps.get_model(model_path)
+                if not hasattr(model, 'ultima_sincronizacao'):
+                    continue
+
+                # Obter timestamp da última sincronização descendente
+                last_sync = model.objects.filter(
+                    ultima_sincronizacao__isnull=False
+                ).order_by('-ultima_sincronizacao').values_list(
+                    'ultima_sincronizacao', flat=True
+                ).first()
+
+                params = {
+                    'instance_id': self.instance_id,
+                    'model': model_path,
+                    'since': last_sync.isoformat() if last_sync else '',
+                }
+
+                try:
+                    response = requests.get(
+                        f'{self.central_url}/api/sync/pull/',
+                        params=params,
+                        headers={
+                            'Authorization': f'Token {self.auth_token}',
+                        },
+                        timeout=30,
+                    )
+
+                    if response.status_code == 200:
+                        result = response.json()
+                        data = result.get('data', '[]')
+                        count = result.get('count', 0)
+
+                        if count == 0:
+                            continue
+
+                        self.stdout.write(f'   📦 {model_path}: a receber {count} registos...')
+
+                        # Deserializar e salvar
+                        with transaction.atomic():
+                            for obj in deserialize('json', data):
+                                # Verificar se já existe por UUID
+                                existing = model.objects.filter(
+                                    uuid_sinc=obj.object.uuid_sinc
+                                ).first()
+
+                                if existing:
+                                    # Actualizar se o remoto é mais novo
+                                    if (obj.object.ultima_sincronizacao and
+                                            existing.ultima_sincronizacao and
+                                            obj.object.ultima_sincronizacao > existing.ultima_sincronizacao):
+                                        obj.save()
+                                else:
+                                    obj.save()
+
+                                # Marcar como sincronizado localmente
+                                model.objects.filter(
+                                    uuid_sinc=obj.object.uuid_sinc
+                                ).update(
+                                    pendente_sinc=False,
+                                    ultima_sincronizacao=timezone.now(),
+                                )
+
+                        self.stdout.write(self.style.SUCCESS(
+                            f'   ✅ {model_path}: {count} recebidos'
+                        ))
+                    else:
+                        self.stdout.write(self.style.ERROR(
+                            f'   ❌ {model_path}: erro HTTP {response.status_code}'
+                        ))
+
+                except requests.ConnectionError:
+                    self.stdout.write(self.style.ERROR(
+                        f'   ❌ Sem conexão com o servidor central'
+                    ))
+                    return
+                except requests.Timeout:
+                    self.stdout.write(self.style.ERROR(
+                        f'   ⏱ Timeout ao receber {model_path}'
+                    ))
+
+            except LookupError:
+                self.stdout.write(self.style.ERROR(f'   ❌ Modelo {model_path} não encontrado'))
+
+    def _run_daemon(self):
+        """Executa sincronização continuamente em background."""
+        interval = settings.SYNC_INTERVAL_SECONDS
+        self.stdout.write(self.style.SUCCESS(
+            f'\n🔁 Modo daemon iniciado (intervalo: {interval}s)\n'
+            f'   Pressione Ctrl+C para parar.\n'
+        ))
+
+        while True:
+            try:
+                self.stdout.write(f'\n⏰ [{timezone.now().strftime("%H:%M:%S")}] A sincronizar...')
+                self._push_data()
+                self._pull_data()
+                self.stdout.write(f'   💤 Próxima sincronização em {interval}s...')
+                time.sleep(interval)
+            except KeyboardInterrupt:
+                self.stdout.write(self.style.SUCCESS('\n👋 Daemon de sincronização parado.'))
+                break
+            except Exception as e:
+                self.stdout.write(self.style.ERROR(f'   ❌ Erro: {e}'))
+                self.stdout.write(f'   🔄 Nova tentativa em {interval}s...')
+                time.sleep(interval)
