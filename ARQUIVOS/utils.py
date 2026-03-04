@@ -114,7 +114,8 @@ def gerar_pdf_despacho(documento, texto_despacho, usuario_responsavel, novo_stat
     Gera um PDF de despacho usando xhtml2pdf (HTML to PDF).
     Inclui um código QR de verificação em vez da assinatura tradicional.
     """
-    admin = documento.administracao
+    # Usar a administração de quem assina o despacho para o cabeçalho/contexto
+    admin = usuario_responsavel.administracao or documento.administracao
     brasao_path = _obter_caminho_brasao()
     logo_path = _obter_caminho_logo_governo()
     linhas_cabecalho = _construir_cabecalho(admin, usuario_responsavel)
