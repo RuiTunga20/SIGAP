@@ -62,6 +62,12 @@ class SyncMixin(models.Model):
         blank=True,
         help_text="Última vez que este registo foi sincronizado"
     )
+    data_modificacao = models.DateTimeField(
+        auto_now=True,
+        null=True,
+        blank=True,
+        help_text="Data da última modificação local (usada para resolução de conflitos)"
+    )
     origem_instancia = models.CharField(
         max_length=100,
         blank=True,

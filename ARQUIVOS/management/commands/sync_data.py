@@ -12,6 +12,10 @@ import json
 import time
 import logging
 import requests
+import base64
+import os
+from django.core.files.base import ContentFile
+from django.db.models import FileField, ImageField
 from datetime import datetime
 
 from django.core.management.base import BaseCommand, CommandError
@@ -142,6 +146,29 @@ class Command(BaseCommand):
                 # Serializar para JSON
                 data = serialize('json', pendentes, use_natural_primary_keys=False)
 
+                # Extrair arquivos em Base64 para envio
+                files_dict = {}
+                file_fields = [f.name for f in model._meta.get_fields() if isinstance(f, (FileField, ImageField))]
+                
+                if file_fields:
+                    for item in pendentes:
+                        item_files = {}
+                        for field_name in file_fields:
+                            field = getattr(item, field_name)
+                            if field and hasattr(field, 'path') and os.path.exists(field.path):
+                                try:
+                                    with open(field.path, "rb") as f:
+                                        encoded = base64.b64encode(f.read()).decode('utf-8')
+                                        item_files[field_name] = {
+                                            'name': os.path.basename(field.name),
+                                            'content': encoded
+                                        }
+                                except Exception as e:
+                                    self.stdout.write(self.style.ERROR(f'   ❌ Erro ao ler ficheiro {field.name}: {e}'))
+                        
+                        if item_files:
+                            files_dict[str(item.uuid_sinc)] = item_files
+
                 try:
                     response = requests.post(
                         f'{self.central_url}/api/sync/push/',
@@ -149,6 +176,7 @@ class Command(BaseCommand):
                             'instance_id': self.instance_id,
                             'model': model_path,
                             'data': data,
+                            'files': files_dict,
                         },
                         headers={
                             'Authorization': f'Token {self.auth_token}',
@@ -240,24 +268,58 @@ class Command(BaseCommand):
 
                         # Deserializar e salvar
                         with transaction.atomic():
+                            files_data_all = result.get('files', {})
+                            file_fields = [f.name for f in model._meta.get_fields() if isinstance(f, (FileField, ImageField))]
+
                             for obj in deserialize('json', data):
+                                instance = obj.object
+                                uuid_str = str(instance.uuid_sinc)
+                                files_data = files_data_all.get(uuid_str, {})
+
                                 # Verificar se já existe por UUID
                                 existing = model.objects.filter(
-                                    uuid_sinc=obj.object.uuid_sinc
+                                    uuid_sinc=instance.uuid_sinc
                                 ).first()
 
-                                if existing:
-                                    # Actualizar se o remoto é mais novo
-                                    if (obj.object.ultima_sincronizacao and
-                                            existing.ultima_sincronizacao and
-                                            obj.object.ultima_sincronizacao > existing.ultima_sincronizacao):
-                                        obj.save()
-                                else:
-                                    obj.save()
+                                # Fallback para CustomUser (evitar erro de username duplicado)
+                                if not existing and model_path == 'ARQUIVOS.CustomUser':
+                                    existing = model.objects.filter(username=instance.username).first()
+                                    if existing:
+                                        # Vincular UUID local ao UUID remoto/central
+                                        model.objects.filter(pk=existing.pk).update(uuid_sinc=instance.uuid_sinc)
+                                        self.stdout.write(self.style.WARNING(f'   ⚠️ Usuário {instance.username} vinculado por username.'))
 
-                                # Marcar como sincronizado localmente
+                                if existing:
+                                    # Estratégia: comparar data_modificacao
+                                    remote_mod = getattr(instance, 'data_modificacao', None)
+                                    local_mod = getattr(existing, 'data_modificacao', None)
+
+                                    if not local_mod or (remote_mod and (not local_mod or remote_mod > local_mod)):
+                                        # Garantir que o ID local é mantido para evitar conflitos de Unique Key (ex: username)
+                                        instance.id = existing.id
+                                        instance.pk = existing.pk
+                                        
+                                        # Processar arquivos se houver
+                                        for field_name in file_fields:
+                                            f_data = files_data.get(field_name)
+                                            if f_data:
+                                                content = base64.b64decode(f_data['content'])
+                                                getattr(instance, field_name).save(f_data['name'], ContentFile(content), save=False)
+                                        
+                                        instance.save(force_update=True)
+                                else:
+                                    # Novo registo, processar arquivos
+                                    for field_name in file_fields:
+                                        f_data = files_data.get(field_name)
+                                        if f_data:
+                                            content = base64.b64decode(f_data['content'])
+                                            getattr(instance, field_name).save(f_data['name'], ContentFile(content), save=False)
+                                    
+                                    instance.save()
+
+                                # Marcar como sincronizado localmente e preservar ultima_sincronizacao do servidor
                                 model.objects.filter(
-                                    uuid_sinc=obj.object.uuid_sinc
+                                    uuid_sinc=instance.uuid_sinc
                                 ).update(
                                     pendente_sinc=False,
                                     ultima_sincronizacao=timezone.now(),
