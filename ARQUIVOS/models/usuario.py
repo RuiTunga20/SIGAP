@@ -60,7 +60,7 @@ class Ministerio(Administracao):
         verbose_name = "Ministério"
         verbose_name_plural = "Ministérios"
 
-class CustomUser(AbstractUser):
+class CustomUser(AbstractUser, SyncMixin):
     objects = UsuarioManager()
 
     NIVEL_CHOICES = [

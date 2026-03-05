@@ -8,7 +8,7 @@ from django.utils import timezone
 from ARQUIVOS.managers import DocumentoManager
 from ARQUIVOS.models.mixins import SoftDeleteModel, AuditoriaModel, SyncMixin
 
-class TipoDocumento(models.Model):
+class TipoDocumento(SyncMixin):
     """
     Tipos de documentos que podem ser cadastrados
     """
@@ -181,7 +181,7 @@ class Documento(SoftDeleteModel, AuditoriaModel, SyncMixin):
         ordering = ['-data_criacao']
 
 
-class Anexo(models.Model):
+class Anexo(SyncMixin):
     """
     Anexos adicionais aos documentos
     """

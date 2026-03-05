@@ -9,6 +9,79 @@
         </h1>
         <p class="text-slate-500 mt-2 font-medium">Faça a exportação e importação manual de pacotes de dados para instâncias sem conexão direta à internet. Apenas os registos pendentes serão exportados.</p>
     </div>
+    </div>
+
+    <!-- Acção Rápida Online -->
+    <div class="mb-8 p-6 bg-gradient-to-r from-blue-600 to-indigo-700 rounded-3xl shadow-xl shadow-blue-200/50 flex flex-col md:flex-row items-center justify-between gap-6 text-white overflow-hidden relative group">
+        <!-- background decor -->
+        <div class="absolute -right-20 -top-20 w-64 h-64 bg-white/10 rounded-full blur-3xl group-hover:bg-white/20 transition-all duration-700"></div>
+        
+        <div class="z-10 relative">
+            <h2 class="text-2xl font-black mb-2 flex items-center gap-2"><i data-lucide="cloud-lightning" class="w-6 h-6"></i> Sincronização em Nuvem</h2>
+            <p class="text-blue-100 font-medium">Tem ligação à internet? Forçe a sincronização de todos os dados pendentes imediatamente para o servidor central.</p>
+        </div>
+        
+        <button id="btn-sync-agora" class="z-10 shrink-0 bg-white text-blue-700 hover:bg-blue-50 hover:scale-105 active:scale-95 transition-all px-6 py-3.5 rounded-xl font-bold font-lg shadow-lg flex items-center gap-2">
+            <i data-lucide="refresh-cw" id="icon-sync-agora" class="w-5 h-5"></i>
+            <span id="text-sync-agora">Sincronizar Agora</span>
+        </button>
+    </div>
+
+    <!-- Tabela de Pendentes -->
+    <div class="mb-10 bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
+        <h3 class="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2"><i data-lucide="list-todo" class="w-5 h-5 text-amber-500"></i> Documentos Pendentes de Sincronização <span class="bg-amber-100 text-amber-700 text-xs py-1 px-2 rounded-full">{{ documentos_pendentes.count }}</span></h3>
+        
+        {% if documentos_pendentes %}
+        <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+                <thead>
+                    <tr class="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider">
+                        <th class="p-4 font-bold rounded-tl-xl whitespace-nowrap">Protocolo</th>
+                        <th class="p-4 font-bold w-full">Assunto</th>
+                        <th class="p-4 font-bold whitespace-nowrap">Data</th>
+                        <th class="p-4 font-bold rounded-tr-xl whitespace-nowrap">Status</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100 text-sm font-medium">
+                    {% for doc in documentos_pendentes|slice:":5" %}
+                    <tr class="hover:bg-slate-50/50 transition-colors">
+                        <td class="p-4 text-slate-600 whitespace-nowrap">{{ doc.numero_protocolo }}</td>
+                        <td class="p-4 text-slate-800">{{ doc.titulo|truncatechars:50 }}</td>
+                        <td class="p-4 text-slate-500 whitespace-nowrap">{{ doc.data_criacao|date:"d/m/Y H:i" }}</td>
+                        <td class="p-4 whitespace-nowrap">
+                            <span class="px-2.5 py-1 text-xs rounded-full bg-{{ doc.get_status_color|default:'slate' }}-100 text-{{ doc.get_status_color|default:'slate' }}-700 border border-{{ doc.get_status_color|default:'slate' }}-200">
+                                {{ doc.get_status_display }}
+                            </span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    {% if documentos_pendentes.count > 5 %}
+                    <tr>
+                        <td colspan="4" class="p-4 text-center text-sm text-slate-500 bg-slate-50/50 italic rounded-b-xl border-t border-slate-100">
+                            E mais {{ documentos_pendentes.count|add:"-5" }} documento(s) pendente(s)...
+                        </td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-8">
+            <div class="w-16 h-16 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                <i data-lucide="check-circle-2" class="w-8 h-8"></i>
+            </div>
+            <h4 class="text-slate-800 font-bold mb-1">Tudo Sincronizado!</h4>
+            <p class="text-slate-500 text-sm">Não há documentos pendentes para enviar ao servidor central.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- divisor offline -->
+    <div class="flex items-center gap-4 mb-8">
+        <div class="h-px bg-slate-200 flex-grow"></div>
+        <span class="text-xs font-bold text-slate-400 uppercase tracking-widest px-4">Modo Offline (Pacotes USB)</span>
+        <div class="h-px bg-slate-200 flex-grow"></div>
+    </div>
 
     <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
         
@@ -93,4 +166,58 @@
 
     </div>
 </div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const btnSync = document.getElementById('btn-sync-agora');
+        if(btnSync) {
+            btnSync.addEventListener('click', async () => {
+                const icon = document.getElementById('icon-sync-agora');
+                const text = document.getElementById('text-sync-agora');
+                
+                // Set loading state
+                btnSync.disabled = true;
+                btnSync.classList.add('opacity-75', 'cursor-not-allowed');
+                icon.classList.add('animate-spin');
+                text.innerText = 'Sincronizando...';
+                
+                try {
+                    const response = await fetch("{% url 'sincronizar_agora' %}", {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRFToken': '{{ csrf_token }}',
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if(response.ok) {
+                        if(typeof Toastify === 'function') {
+                            Toastify({text: "Sincronização Online Concluída!", duration: 3000, style: {background: "#10b981"}}).showToast();
+                        } else {
+                            alert("Sincronização Online Concluída!");
+                        }
+                        // Reload to clear pending list
+                        setTimeout(() => window.location.reload(), 1500);
+                    } else {
+                        throw new Error(data.mensagem || 'Erro desconhecido');
+                    }
+                } catch(error) {
+                    if(typeof Toastify === 'function') {
+                        Toastify({text: "Falha na sincronização: " + error.message, duration: 5000, style: {background: "#ef4444"}}).showToast();
+                    } else {
+                        alert("Falha na sincronização: " + error.message);
+                    }
+                    
+                    // Reset state
+                    btnSync.disabled = false;
+                    btnSync.classList.remove('opacity-75', 'cursor-not-allowed');
+                    icon.classList.remove('animate-spin');
+                    text.innerText = 'Tentar Novamente';
+                }
+            });
+        }
+    });
+</script>
 {% endblock %}

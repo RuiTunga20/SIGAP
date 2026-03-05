@@ -1,7 +1,8 @@
 from django.db import models
 from django.conf import settings
+from ARQUIVOS.models.mixins import SyncMixin
 
-class ConfiguracaoSistema(models.Model):
+class ConfiguracaoSistema(SyncMixin):
     """
     Configurações gerais do sistema
     """
@@ -18,7 +19,7 @@ class ConfiguracaoSistema(models.Model):
         verbose_name_plural = "Configurações"
 
 
-class Notificacao(models.Model):
+class Notificacao(SyncMixin):
     """
     Modelo simplificado para notificações.
     Cada notificação é criada diretamente para um usuário específico.

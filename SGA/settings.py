@@ -276,13 +276,17 @@ SYNC_INSTANCE_ID = os.environ.get('SYNC_INSTANCE_ID', socket.gethostname())
 # Modelos a sincronizar (ordem importa: dependências primeiro)
 SYNC_MODELS = [
     'ARQUIVOS.Administracao',
+    'ARQUIVOS.CustomUser',
+    'ARQUIVOS.TipoDocumento',
     'ARQUIVOS.Departamento',
     'ARQUIVOS.Seccoes',
-    'ARQUIVOS.TipoDocumento',
     'ARQUIVOS.Documento',
-    'ARQUIVOS.MovimentacaoDocumento',
     'ARQUIVOS.Anexo',
+    'ARQUIVOS.MovimentacaoDocumento',
     'ARQUIVOS.Notificacao',
+    'ARQUIVOS.ConfiguracaoSistema',
+    'ARQUIVOS.LocalArmazenamento',
+    'ARQUIVOS.ArmazenamentoDocumento',
 ]
 
 # Tamanho do lote para envio/recebimento

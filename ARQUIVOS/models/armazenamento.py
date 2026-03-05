@@ -1,8 +1,9 @@
 from django.db import models
 from django.conf import settings
 from django.core.exceptions import ValidationError
+from ARQUIVOS.models.mixins import SyncMixin
 
-class LocalArmazenamento(models.Model):
+class LocalArmazenamento(SyncMixin):
     """
     Modelo para cadastrar locais físicos de armazenamento de documentos.
     Estrutura: Estante > Prateleira > Dossiê
@@ -94,7 +95,7 @@ class LocalArmazenamento(models.Model):
         ordering = ['departamento', 'tipo', 'codigo']
 
 
-class ArmazenamentoDocumento(models.Model):
+class ArmazenamentoDocumento(SyncMixin):
     """
     Modelo para registrar onde cada documento é guardado fisicamente.
     Criado automaticamente quando:

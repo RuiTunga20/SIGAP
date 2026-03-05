@@ -79,6 +79,7 @@ path('notificacoes/marcar-como-lidas/', views.marcar_notificacoes_como_lidas, na
 
     # Sincronização Manual (Interface Gráfica)
     path('sincronizacao/', __import__('ARQUIVOS.sync_views', fromlist=['painel_sincronizacao']).painel_sincronizacao, name='painel_sincronizacao'),
+    path('sincronizacao/agora/', __import__('ARQUIVOS.sync_views', fromlist=['sincronizar_agora']).sincronizar_agora, name='sincronizar_agora'),
 ]
 
 # Servir arquivos media e static

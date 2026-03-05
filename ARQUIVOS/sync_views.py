@@ -191,9 +191,9 @@ def sync_status(request):
 from django.shortcuts import render, redirect
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from ARQUIVOS.models import Administracao
-from ARQUIVOS.sincronizacao import exportar_pacote, marcar_como_sincronizado, importar_pacote
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
+from django.core.management import call_command
+from ARQUIVOS.models import Administracao, Documento
 
 @login_required
 def painel_sincronizacao(request):
@@ -239,4 +239,22 @@ def painel_sincronizacao(request):
         return redirect('painel_sincronizacao')
         
     administracoes = Administracao.objects.exclude(id=request.user.administracao.id)
-    return render(request, 'Paginas/sincronizacao.html', {'administracoes': administracoes})
+    documentos_pendentes = Documento.objects.filter(pendente_sinc=True).order_by('-data_criacao')
+    
+    context = {
+        'administracoes': administracoes,
+        'documentos_pendentes': documentos_pendentes
+    }
+    return render(request, 'Paginas/sincronizacao.html', context)
+
+@login_required
+@require_POST
+def sincronizar_agora(request):
+    """View para acionar a sincronização com a nuvem instantaneamente."""
+    try:
+        # Executa o comando de sincronização
+        call_command('sync_data')
+        return JsonResponse({'status': 'sucesso', 'mensagem': 'Sincronização concluída com sucesso!'})
+    except Exception as e:
+        logger.error(f'Erro na sincronização manual: {e}')
+        return JsonResponse({'status': 'erro', 'mensagem': str(e)}, status=500)
