@@ -22,6 +22,7 @@ import base64
 import os
 from django.core.files.base import ContentFile
 from django.db.models import FileField, ImageField
+from ARQUIVOS.consumers import send_notification_sync, send_pendencia_update_sync
 
 logger = logging.getLogger('sync')
 
@@ -84,39 +85,40 @@ def sync_push(request):
                 # Extrair arquivos do JSON estendido
                 files_data = body.get('files', {}).get(str(uuid_sinc), {})
 
-                # Verificar se já existe
+                # 1. Verificar se já existe (por UUID ou Fallback de Username para CustomUser)
                 existing = model.objects.filter(uuid_sinc=uuid_sinc).first()
                 
-                # Fallback para CustomUser por username (evita erros unique se UUIDs divergirem)
                 if not existing and model_path == 'ARQUIVOS.CustomUser':
                     existing = model.objects.filter(username=instance.username).first()
                     if existing:
-                        # Se encontramos pelo username, atualizamos o UUID local para bater com o global/central
                         model.objects.filter(pk=existing.pk).update(uuid_sinc=uuid_sinc)
                         logger.info(f'Vinculado usuário {instance.username} por username e atualizado UUID.')
-                    # Estratégia: quem tem a data_modificacao mais recente vence
-                    # No Django, auto_now preenche ao salvar, mas vamos comparar os valores vindos do JSON
+
+                # 2. Resolução de Conflitos ou Inserção
+                if existing:
+                    # Estratégia: o que tem a data_modificacao mais recente vence
                     remote_mod = getattr(instance, 'data_modificacao', None)
                     local_mod = getattr(existing, 'data_modificacao', None)
 
-                    # Se o remoto for mais recente, atualizamos o local
-                    if not local_mod or (remote_mod and (not local_mod or remote_mod > local_mod)):
-                        # Garantir que usamos o ID local para não criar duplicado por PK
+                    if not local_mod or (remote_mod and remote_mod > local_mod):
+                        # Remoto é mais recente: Atualizar local
                         instance.id = existing.id
                         instance.pk = existing.pk
                         
-                        # Primeiro, processar arquivos se houver
                         for field_name in file_fields:
                             field_data = files_data.get(field_name)
                             if field_data:
                                 content = base64.b64decode(field_data['content'])
                                 getattr(instance, field_name).save(field_data['name'], ContentFile(content), save=False)
                         
-                        # Guardar forçando o update se o ID já existe
                         instance.save(force_update=True)
-                    # Se local é mais recente ou igual, ignoramos o push para manter a versão mais nova
+                    else:
+                        # Local é mais recente: Ignorar push silenciosamente para este objeto
+                        logger.debug(f'Ignorado push de {uuid_sinc}: versão local é mais recente.')
+                        synced_uuids.append(str(uuid_sinc)) # Marcar como "feito" para o cliente não reenviar
+                        continue
                 else:
-                    # Novo registo, guardar
+                    # Novo registo: Inserir
                     for field_name in file_fields:
                         field_data = files_data.get(field_name)
                         if field_data:
@@ -131,6 +133,22 @@ def sync_push(request):
                     origem_instancia=instance_id,
                 )
                 synced_uuids.append(str(uuid_sinc))
+
+                # --- Gatilhos de WebSocket Real-time ---
+                try:
+                    if model_path == 'ARQUIVOS.Notificacao':
+                        group_name = f"user_{instance.usuario_id}"
+                        send_notification_sync(group_name, instance.mensagem, instance.link)
+                    elif model_path == 'ARQUIVOS.MovimentacaoDocumento':
+                        # Se for encaminhamento, notificar o destino
+                        if instance.tipo_movimentacao == 'encaminhamento':
+                            if instance.seccao_destino_id:
+                                group_name = f"seccao_{instance.seccao_destino_id}"
+                            else:
+                                group_name = f"departamento_{instance.departamento_destino_id}"
+                            send_pendencia_update_sync(group_name, f"Novo documento recebido: {instance.documento.numero_protocolo}")
+                except Exception as ws_err:
+                    logger.warning(f"Erro ao disparar WebSocket durante sync push: {ws_err}")
 
         logger.info(f'Sync push de {instance_id}: {len(synced_uuids)} registos de {model_path}')
 

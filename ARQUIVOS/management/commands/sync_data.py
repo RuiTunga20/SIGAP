@@ -16,6 +16,7 @@ import base64
 import os
 from django.core.files.base import ContentFile
 from django.db.models import FileField, ImageField
+from ARQUIVOS.consumers import send_notification_sync, send_pendencia_update_sync
 from datetime import datetime
 
 from django.core.management.base import BaseCommand, CommandError
@@ -290,16 +291,15 @@ class Command(BaseCommand):
                                         self.stdout.write(self.style.WARNING(f'   ⚠️ Usuário {instance.username} vinculado por username.'))
 
                                 if existing:
-                                    # Estratégia: comparar data_modificacao
+                                    # Estratégia: o que tem a data_modificacao mais recente vence
                                     remote_mod = getattr(instance, 'data_modificacao', None)
                                     local_mod = getattr(existing, 'data_modificacao', None)
 
-                                    if not local_mod or (remote_mod and (not local_mod or remote_mod > local_mod)):
-                                        # Garantir que o ID local é mantido para evitar conflitos de Unique Key (ex: username)
+                                    if not local_mod or (remote_mod and remote_mod > local_mod):
+                                        # Remoto é mais recente: Atualizar local
                                         instance.id = existing.id
                                         instance.pk = existing.pk
                                         
-                                        # Processar arquivos se houver
                                         for field_name in file_fields:
                                             f_data = files_data.get(field_name)
                                             if f_data:
@@ -307,6 +307,9 @@ class Command(BaseCommand):
                                                 getattr(instance, field_name).save(f_data['name'], ContentFile(content), save=False)
                                         
                                         instance.save(force_update=True)
+                                    else:
+                                        # Local é mais recente: Ignorar pull silenciosamente para este objeto
+                                        continue
                                 else:
                                     # Novo registo, processar arquivos
                                     for field_name in file_fields:
@@ -324,6 +327,21 @@ class Command(BaseCommand):
                                     pendente_sinc=False,
                                     ultima_sincronizacao=timezone.now(),
                                 )
+
+                                # --- Gatilhos de WebSocket Real-time ---
+                                try:
+                                    if model_path == 'ARQUIVOS.Notificacao':
+                                        group_name = f"user_{instance.usuario_id}"
+                                        send_notification_sync(group_name, instance.mensagem, instance.link)
+                                    elif model_path == 'ARQUIVOS.MovimentacaoDocumento':
+                                        if instance.tipo_movimentacao == 'encaminhamento':
+                                            if instance.seccao_destino_id:
+                                                group_name = f"seccao_{instance.seccao_destino_id}"
+                                            else:
+                                                group_name = f"departamento_{instance.departamento_destino_id}"
+                                            send_pendencia_update_sync(group_name, f"Novo documento recebido via sync: {instance.documento.numero_protocolo}")
+                                except Exception as ws_err:
+                                    self.stdout.write(self.style.WARNING(f'   ⚠️ Erro ao disparar WebSocket durante sync pull: {ws_err}'))
 
                         self.stdout.write(self.style.SUCCESS(
                             f'   ✅ {model_path}: {count} recebidos'
