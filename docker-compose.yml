@@ -9,11 +9,15 @@ services:
     restart: unless-stopped
     ports:
       - "8000:8000"
+    env_file:
+      - .env
     environment:
       - DEBUG=False
       - DATABASE_URL=postgres://sga_user:sga_password@db:5432/sga_db
       - REDIS_URL=redis://redis:6379/0
       - DJANGO_SETTINGS_MODULE=SGA.settings
+      - SYNC_CENTRAL_URL=${SYNC_CENTRAL_URL:-}
+      - SYNC_AUTH_TOKEN=${SYNC_AUTH_TOKEN:-}
       - EMAIL_HOST=mail.bryzzafood.com
       - EMAIL_PORT=465
       - EMAIL_USE_TLS=False
