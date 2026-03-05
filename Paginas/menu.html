@@ -285,34 +285,33 @@
 <!-- Script de verificação de conectividade -->
 <script>
 (function() {
-    const POLL_INTERVAL = 15000; // 15 segundos
+    const POLL_INTERVAL = 15000; // 15 segundos p/ detecção mais rápida
     let wasOffline = false;
 
     function updateIndicator(online) {
+        // Validação extra: se o navegador diz que está offline, ignora o fetch
+        if (!navigator.onLine) online = false;
+
         const dot = document.getElementById('syncDot');
         const label = document.getElementById('syncLabel');
         const indicator = document.getElementById('syncIndicator');
+
         if (!dot || !label || !indicator) return;
 
         if (online) {
-            dot.className = 'w-2 h-2 rounded-full bg-emerald-500';
+            dot.className = 'w-2 h-2 rounded-full bg-emerald-500 animate-pulse';
             label.textContent = 'Online';
             label.className = 'text-[10px] font-bold uppercase tracking-widest text-emerald-600';
             indicator.className = 'flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-emerald-50 border border-emerald-100 transition-all cursor-default';
 
             if (wasOffline) {
-                // Mostrar toast de reconexão
                 if (window.Toastify) {
                     Toastify({
                         text: "🟢 Conexão restabelecida! A sincronizar dados...",
                         duration: 5000,
                         gravity: "top",
                         position: "center",
-                        style: {
-                            background: "#22c55e",
-                            borderRadius: "12px",
-                            fontWeight: "600",
-                        }
+                        style: { background: "#22c55e", borderRadius: "12px", fontWeight: "600" }
                     }).showToast();
                 }
                 wasOffline = false;
@@ -327,21 +326,22 @@
     }
 
     function checkConnection() {
+        if (!navigator.onLine) {
+            updateIndicator(false);
+            return;
+        }
+
         const url = (window.SGA_CONFIG && window.SGA_CONFIG.syncStatusUrl) || '/api/sync/status/';
-        fetch(url, { method: 'GET', cache: 'no-store' })
-            .then(function(resp) {
-                updateIndicator(resp.ok);
-            })
-            .catch(function() {
-                updateIndicator(false);
-            });
+        fetch(url, { method: 'GET', cache: 'no-store', timeout: 5000 })
+            .then(function(resp) { return resp.json(); })
+            .then(function(data) { updateIndicator(data.status === 'online'); })
+            .catch(function() { updateIndicator(false); });
     }
 
-    // Verificar rede do navegador
+    // Eventos nativos do browser (instantâneos)
     window.addEventListener('online', function() { checkConnection(); });
     window.addEventListener('offline', function() { updateIndicator(false); });
 
-    // Poll periódico
     document.addEventListener('DOMContentLoaded', function() {
         checkConnection();
         setInterval(checkConnection, POLL_INTERVAL);

@@ -17,6 +17,7 @@ from django.conf import settings
 from django.utils import timezone
 from django.db import transaction
 from functools import wraps
+import requests
 
 logger = logging.getLogger('sync')
 
@@ -166,11 +167,22 @@ def sync_pull(request):
 def sync_status(request):
     """
     Endpoint público para verificar se o servidor está online.
-    Usado pelo frontend para mostrar o indicador de conexão.
-    Não requer autenticação.
+    Tenta pingar o servidor central para confirmar conectividade real.
     """
+    central_url = getattr(settings, 'SYNC_CENTRAL_URL', '')
+    is_central_reachable = False
+    
+    if central_url:
+        try:
+            # Tenta um HEAD request rápido para não sobrecarregar
+            response = requests.head(central_url, timeout=3)
+            is_central_reachable = response.status_code < 400
+        except Exception:
+            is_central_reachable = False
+    
     return JsonResponse({
-        'status': 'online',
+        'status': 'online' if (not central_url or is_central_reachable) else 'offline',
+        'central_reachable': is_central_reachable,
         'instance_id': getattr(settings, 'SYNC_INSTANCE_ID', 'offline'),
         'timestamp': timezone.now().isoformat(),
     })

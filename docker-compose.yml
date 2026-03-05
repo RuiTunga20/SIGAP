@@ -93,6 +93,31 @@ services:
     depends_on:
       - web
 
+  # =====================
+  # Sync Daemon (Offline)
+  # =====================
+  sync_daemon:
+    build: .
+    container_name: sga_sync_daemon
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - DEBUG=False
+      - DATABASE_URL=postgres://sga_user:sga_password@db:5432/sga_db
+      - REDIS_URL=redis://redis:6379/0
+      - DJANGO_SETTINGS_MODULE=SGA.settings
+      - SYNC_CENTRAL_URL=${SYNC_CENTRAL_URL:-}
+      - SYNC_AUTH_TOKEN=${SYNC_AUTH_TOKEN:-}
+    volumes:
+      - .:/app
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: python manage.py sync_data --daemon
+
 volumes:
   postgres_data:
   redis_data:

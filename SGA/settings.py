@@ -23,7 +23,7 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-r#f7)g%=rdp8ld331qv3q
 DEBUG =  True
 #os.environ.get('DEBUG', 'True').lower() in ('true', '1', 'yes')
 
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '192.168.0.213,localhost,127.0.0.1,0.0.0.0,192.168.1.191,192.168.1.192,sigap-1.onrender.com').split(',')
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '192.168.0.213,localhost,127.0.0.1,0.0.0.0,192.168.1.191,192.168.1.192,gap-1.onrender.com,sigap-1.onrender.com').split(',')
 
 # CSRF Trusted Origins (para Docker/produção)
 # CSRF Trusted Origins (para Docker/produção)
@@ -35,6 +35,7 @@ CSRF_TRUSTED_ORIGINS_DEFAULT = [
     'http://192.168.1.191:8000',
     'http://192.168.1.192',
     'http://192.168.1.192:8000',
+    'https://gap-1.onrender.com',
     'https://sigap-1.onrender.com'
 ]
 CSRF_TRUSTED_ORIGINS = list(filter(None, set(CSRF_TRUSTED_ORIGINS_ENV + CSRF_TRUSTED_ORIGINS_DEFAULT)))
