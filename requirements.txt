@@ -38,3 +38,7 @@ qrcode==7.4.2
 
 # Editor de Texto Rico
 django-tinymce==3.7.1
+
+# Sincronização e API
+requests==2.31.0
+urllib3<2.0
