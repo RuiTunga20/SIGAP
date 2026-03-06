@@ -23,6 +23,8 @@ import os
 from django.core.files.base import ContentFile
 from django.db.models import FileField, ImageField
 from ARQUIVOS.consumers import send_notification_sync, send_pendencia_update_sync
+from ARQUIVOS.sincronizacao import exportar_pacote, importar_pacote, marcar_como_sincronizado
+from ARQUIVOS.sincronizacao import exportar_pacote, importar_pacote, marcar_como_sincronizado
 
 logger = logging.getLogger('sync')
 
@@ -117,7 +119,8 @@ def sync_push(request):
                                 getattr(existing, field_name).save(field_data['name'], ContentFile(content), save=False)
                         
                         # Guardar o objeto existente (faz o UPDATE)
-                        existing.save()
+                        # Usamos pendente_sinc=False para evitar que o save() do mixin marque como pendente
+                        existing.save(update_fields=[f.name for f in model._meta.fields if not f.primary_key] + ['pendente_sinc'])
                         # Vincular instance ao existente para uso nos gatilhos de WS abaixo
                         instance = existing 
                     else:
@@ -132,6 +135,7 @@ def sync_push(request):
                         if field_data:
                             content = base64.b64decode(field_data['content'])
                             getattr(instance, field_name).save(field_data['name'], ContentFile(content), save=False)
+                    instance.pendente_sinc = False
                     instance.save()
 
                 # Marcar como sincronizado e definir origem

@@ -310,7 +310,8 @@ class Command(BaseCommand):
                                                 content = base64.b64decode(f_data['content'])
                                                 getattr(existing, field_name).save(f_data['name'], ContentFile(content), save=False)
                                         
-                                        existing.save()
+                                        # Usar pendente_sinc=False para evitar que o save() do mixin marque como pendente
+                                        existing.save(update_fields=[f.name for f in model._meta.fields if not f.primary_key] + ['pendente_sinc'])
                                         instance = existing
                                     else:
                                         # Local é mais recente: Ignorar pull silenciosamente
@@ -323,6 +324,7 @@ class Command(BaseCommand):
                                             content = base64.b64decode(f_data['content'])
                                             getattr(instance, field_name).save(f_data['name'], ContentFile(content), save=False)
                                     
+                                    instance.pendente_sinc = False
                                     instance.save()
 
                                 # Marcar como sincronizado localmente e preservar ultima_sincronizacao do servidor

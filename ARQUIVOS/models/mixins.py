@@ -68,12 +68,17 @@ class SyncMixin(models.Model):
         blank=True,
         help_text="Data da última modificação local (usada para resolução de conflitos)"
     )
-    origem_instancia = models.CharField(
-        max_length=100,
-        blank=True,
-        default='',
-        help_text="Identificador da instância que criou este registo (ex: 'admin_municipal_cabinda')"
-    )
+    def save(self, *args, **kwargs):
+        # Se 'pendente_sinc' não for passado explicitamente, Assume que é uma alteração local
+        # que precisa de ser sincronizada (exceto se estivermos no meio de um processo de sync)
+        if 'update_fields' in kwargs:
+            if 'pendente_sinc' not in kwargs['update_fields']:
+                self.pendente_sinc = True
+                kwargs['update_fields'] = list(kwargs['update_fields']) + ['pendente_sinc']
+        else:
+            self.pendente_sinc = True
+            
+        super().save(*args, **kwargs)
 
     class Meta:
         abstract = True
