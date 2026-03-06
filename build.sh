@@ -59,4 +59,6 @@ python criar_usuarios_padrao.py
 echo "--- Criando Super Admin MAT ---"
 python create_super_mat.py
 
+python manage.py fix_sequences
+
 echo "✅ Build concluído com sucesso!"
