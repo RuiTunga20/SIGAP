@@ -290,6 +290,7 @@ class Command(BaseCommand):
                                         model.objects.filter(pk=existing.pk).update(uuid_sinc=instance.uuid_sinc)
                                         self.stdout.write(self.style.WARNING(f'   ⚠️ Usuário {instance.username} vinculado por username.'))
 
+                                # 2. Resolução de Conflitos ou Inserção
                                 if existing:
                                     # Estratégia: o que tem a data_modificacao mais recente vence
                                     remote_mod = getattr(instance, 'data_modificacao', None)
@@ -297,21 +298,25 @@ class Command(BaseCommand):
 
                                     if not local_mod or (remote_mod and remote_mod > local_mod):
                                         # Remoto é mais recente: Atualizar local
-                                        instance.id = existing.id
-                                        instance.pk = existing.pk
+                                        # Copiar campos manualmente para evitar erros de validação com PK
+                                        for field in model._meta.fields:
+                                            if not field.primary_key and field.name not in ['uuid_sinc']:
+                                                setattr(existing, field.name, getattr(instance, field.name))
                                         
+                                        # Processar arquivos se houver
                                         for field_name in file_fields:
                                             f_data = files_data.get(field_name)
                                             if f_data:
                                                 content = base64.b64decode(f_data['content'])
-                                                getattr(instance, field_name).save(f_data['name'], ContentFile(content), save=False)
+                                                getattr(existing, field_name).save(f_data['name'], ContentFile(content), save=False)
                                         
-                                        instance.save(force_update=True)
+                                        existing.save()
+                                        instance = existing
                                     else:
-                                        # Local é mais recente: Ignorar pull silenciosamente para este objeto
+                                        # Local é mais recente: Ignorar pull silenciosamente
                                         continue
                                 else:
-                                    # Novo registo, processar arquivos
+                                    # Novo registo: Inserir
                                     for field_name in file_fields:
                                         f_data = files_data.get(field_name)
                                         if f_data:

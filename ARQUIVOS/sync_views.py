@@ -102,20 +102,28 @@ def sync_push(request):
 
                     if not local_mod or (remote_mod and remote_mod > local_mod):
                         # Remoto é mais recente: Atualizar local
-                        instance.id = existing.id
-                        instance.pk = existing.pk
+                        # Em vez de converter PK, copiamos os campos para o objeto existente
+                        # Isto evita erros de validação (full_clean) com chaves únicas/IDs
+                        for field in model._meta.fields:
+                            # Não copiar PK nem uuid_sinc
+                            if not field.primary_key and field.name not in ['uuid_sinc']:
+                                setattr(existing, field.name, getattr(instance, field.name))
                         
+                        # Processar arquivos se houver
                         for field_name in file_fields:
                             field_data = files_data.get(field_name)
                             if field_data:
                                 content = base64.b64decode(field_data['content'])
-                                getattr(instance, field_name).save(field_data['name'], ContentFile(content), save=False)
+                                getattr(existing, field_name).save(field_data['name'], ContentFile(content), save=False)
                         
-                        instance.save(force_update=True)
+                        # Guardar o objeto existente (faz o UPDATE)
+                        existing.save()
+                        # Vincular instance ao existente para uso nos gatilhos de WS abaixo
+                        instance = existing 
                     else:
-                        # Local é mais recente: Ignorar push silenciosamente para este objeto
+                        # Local é mais recente: Ignorar push silenciosamente
                         logger.debug(f'Ignorado push de {uuid_sinc}: versão local é mais recente.')
-                        synced_uuids.append(str(uuid_sinc)) # Marcar como "feito" para o cliente não reenviar
+                        synced_uuids.append(str(uuid_sinc))
                         continue
                 else:
                     # Novo registo: Inserir
