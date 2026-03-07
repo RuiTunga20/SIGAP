@@ -234,17 +234,20 @@ class Command(BaseCommand):
                 if not hasattr(model, 'ultima_sincronizacao'):
                     continue
 
-                # Obter timestamp da última sincronização descendente
+                from datetime import timedelta
                 last_sync = model.objects.filter(
                     ultima_sincronizacao__isnull=False
                 ).order_by('-ultima_sincronizacao').values_list(
                     'ultima_sincronizacao', flat=True
                 ).first()
 
+                # Margem de segurança para lidar com variações de relógio entre os servidores
+                since_time = last_sync - timedelta(minutes=5) if last_sync else None
+
                 params = {
                     'instance_id': self.instance_id,
                     'model': model_path,
-                    'since': last_sync.isoformat() if last_sync else '',
+                    'since': since_time.isoformat() if since_time else '',
                 }
 
                 try:

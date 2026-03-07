@@ -21,7 +21,7 @@ import requests
 import base64
 import os
 from django.core.files.base import ContentFile
-from django.db.models import FileField, ImageField
+from django.db.models import Q, FileField, ImageField
 from ARQUIVOS.consumers import send_notification_sync, send_pendencia_update_sync
 from ARQUIVOS.sincronizacao import exportar_pacote, importar_pacote, marcar_como_sincronizado
 from ARQUIVOS.sincronizacao import exportar_pacote, importar_pacote, marcar_como_sincronizado
@@ -200,14 +200,20 @@ def sync_pull(request):
         model = apps.get_model(model_path)
         batch_size = settings.SYNC_BATCH_SIZE
 
-        # Obter todos os registos relevantes (incluindo os que este cliente criou mas que podem ter sido editados na nuvem)
+        # Obter todos os registos relevantes
         queryset = model.objects.all()
+
+        # Evitar enviar de volta o que a própria instância acabou de carregar
+        if instance_id and hasattr(model, 'origem_instancia'):
+            queryset = queryset.exclude(origem_instancia=instance_id)
 
         if since:
             from django.utils.dateparse import parse_datetime
             since_dt = parse_datetime(since)
             if since_dt:
-                queryset = queryset.filter(ultima_sincronizacao__gt=since_dt)
+                # CORREÇÃO: Usar data_modificacao OU ultima_sincronizacao
+                # Garante que dados criados na nuvem (sem ultima_sincronizacao) sejam sincronizados
+                queryset = queryset.filter(Q(ultima_sincronizacao__gt=since_dt) | Q(data_modificacao__gt=since_dt))
 
         queryset = queryset[:batch_size]
         count = queryset.count()
