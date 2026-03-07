@@ -20,6 +20,10 @@ else
     python manage.py migrate --no-input
 fi
 
+# Corrigir sequências antes de popular para evitar IntegrityError
+echo "--- Corrigindo Sequências (Postgres) ---"
+python manage.py fix_sequences
+
 # Arranque: gunicorn com uvicorn workers (definido no Procfile ou no Render dashboard)
 # gunicorn SGA.asgi:application --worker-class uvicorn.workers.UvicornWorker --workers 4 --bind 0.0.0.0:$PORT
 
@@ -59,6 +63,6 @@ python criar_usuarios_padrao.py
 echo "--- Criando Super Admin MAT ---"
 python create_super_mat.py
 
-python manage.py fix_sequences
+# python manage.py fix_sequences # Movido para antes da população
 
 echo "✅ Build concluído com sucesso!"
