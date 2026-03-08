@@ -1,6 +1,9 @@
 import io
 import os
 import base64
+import requests
+import json
+import logging
 from django.core.files.base import ContentFile
 from django.conf import settings
 from reportlab.lib.pagesizes import A4
@@ -187,3 +190,49 @@ def gerar_pdf_despacho(documento, texto_despacho, usuario_responsavel, novo_stat
         buffer.getvalue(),
         name=f"despacho_{documento.numero_protocolo.replace('/', '-')}.pdf"
     )
+
+logger = logging.getLogger(__name__)
+
+def enviar_whatsapp_notificacao(telefone, context=None):
+    """
+    Envia uma notificação via WhatsApp utilizando a API oficial da Meta.
+    O telefone deve ser válido (idealmente com indicativo 244 para Angola).
+    """
+    if not telefone:
+        return False
+        
+    numero = str(telefone).strip().replace(" ", "")
+    if len(numero) == 9 and numero.isdigit():
+        numero = f"244{numero}"
+        
+    phone_number_id = getattr(settings, 'WHATSAPP_PHONE_NUMBER_ID', os.getenv('WHATSAPP_PHONE_NUMBER_ID', '101884902726142'))
+    token = getattr(settings, 'WHATSAPP_TOKEN', os.getenv('WHATSAPP_TOKEN', 'EAAZAAatU6EMIBQZCwChKX7HlVdEaX77r1Yhmf6ynSthatVZAt5jZBiVwTIZBXgsLlxYovEHS5pBRRJt7LRZApYfkoDors2fANpwvOG6QHkwLeknEtW0uUXDbt1UB3SmsqlCshZBNTMfGZAL9ySQFJP9WlM35qt6aL39uSfOMXQnnNpaQ014Db7Pd1iewdfad6DRYKr1OxLyLwJgbdIPZAZCBfc6n5hZCD8cm8lld4OCO0cZB5E7lpGvPSJhCTo9FtmzwGb6j6TgrwZC1atZBMZCexB3NML1WoiIhwZDZD'))
+    
+    url = f"https://graph.facebook.com/v22.0/{phone_number_id}/messages"
+    
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json"
+    }
+    
+    payload = {
+        "messaging_product": "whatsapp",
+        "to": numero,
+        "type": "template",
+        "template": {
+            "name": "hello_world",
+            "language": {
+                "code": "en_US"
+            }
+        }
+    }
+    
+    try:
+        response = requests.post(url, headers=headers, json=payload, timeout=10)
+        response.raise_for_status()
+        return True
+    except Exception as e:
+        logger.error(f"Erro ao enviar WhatsApp para {numero}: {str(e)}")
+        if hasattr(e, 'response') and getattr(e, 'response', None) is not None:
+             logger.error(f"Detalhes: {e.response.text}")
+        return False

@@ -17,7 +17,7 @@ from .formularios import *
 from django.db.models import Count, Case, When, IntegerField
 from django.core.mail import EmailMessage
 from django.template.loader import render_to_string
-from ARQUIVOS.utils import gerar_pdf_despacho
+from ARQUIVOS.utils import gerar_pdf_despacho, enviar_whatsapp_notificacao
 from django.urls import reverse
 from ARQUIVOS.decorators import requer_contexto_hierarquico
 from django.db.models.functions import TruncDate, Now
@@ -814,20 +814,19 @@ def detalhe_documento(request, documento_id):
                     documento.arquivo_digitalizado.save(pdf_content.name, pdf_content, save=False)
                     documento.save()
                     
-                    # 3. Enviar Email se o documento tiver email associado
+                    # 3. Preparar contexto para notificações
+                    email_context = {
+                        'utente': documento.utente or "Utente",
+                        'protocolo': documento.numero_protocolo,
+                        'titulo': documento.titulo,
+                        'status': documento.get_status_display(),
+                        'administracao': request.user.administracao.nome if request.user.administracao else 'Administração SIGAP',
+                        'ano': timezone.now().year
+                    }
+                    
+                    notificou_email = False
                     if documento.email:
                         assunto = f"Notificação de Despacho - Protocolo {documento.numero_protocolo}"
-                        
-                        # Contexto para o template de email
-                        email_context = {
-                            'utente': documento.utente or "Utente",
-                            'protocolo': documento.numero_protocolo,
-                            'titulo': documento.titulo,
-                            'status': documento.get_status_display(),
-                            'administracao': request.user.administracao.nome if request.user.administracao else 'Administração SIGAP',
-                            'ano': timezone.now().year
-                        }
-                        
                         mensagem_html = render_to_string('emails/despacho_email.html', email_context)
                         
                         email = EmailMessage(
@@ -842,10 +841,23 @@ def detalhe_documento(request, documento_id):
                         pdf_content.seek(0)
                         email.attach(pdf_content.name, pdf_content.read(), 'application/pdf')
                         email.send(fail_silently=False)
+                        notificou_email = True
                         
-                        messages.success(request, f'Despacho registado e notificação enviada para {documento.email}.')
+                    notificou_wp = False
+                    if documento.telefone:
+                        notificou_wp = enviar_whatsapp_notificacao(documento.telefone, email_context)
+                    
+                    msg_sucesso = "Despacho registado."
+                    if notificou_email and notificou_wp:
+                        msg_sucesso += f" Notificação enviada por email ({documento.email}) e WhatsApp ({documento.telefone})."
+                    elif notificou_email:
+                        msg_sucesso += f" Notificação enviada para {documento.email}."
+                    elif notificou_wp:
+                        msg_sucesso += f" Notificação enviada por WhatsApp para {documento.telefone}."
                     else:
-                        messages.success(request, 'Despacho registado. (Documento sem email para notificação)')
+                        msg_sucesso += " (Sem canais de notificação)"
+                        
+                    messages.success(request, msg_sucesso)
                         
                 except Exception as e:
                     # Logar erro mas não impedir o fluxo principal
@@ -907,16 +919,17 @@ def detalhe_documento(request, documento_id):
                     pdf_content = gerar_pdf_despacho(documento, texto_despacho, request.user, action, request=request)
                     documento.arquivo_digitalizado.save(pdf_content.name, pdf_content, save=False)
                     
+                    email_context = {
+                        'utente': documento.utente or "Utente",
+                        'protocolo': documento.numero_protocolo,
+                        'titulo': documento.titulo,
+                        'status': documento.get_status_display(),
+                        'administracao': request.user.administracao.nome if request.user.administracao else 'Administração SIGAP',
+                        'ano': timezone.now().year
+                    }
+
                     if documento.email:
                         assunto = f"Notificação de Decisão Final - Protocolo {documento.numero_protocolo}"
-                        email_context = {
-                            'utente': documento.utente or "Utente",
-                            'protocolo': documento.numero_protocolo,
-                            'titulo': documento.titulo,
-                            'status': documento.get_status_display(),
-                            'administracao': request.user.administracao.nome if request.user.administracao else 'Administração SIGAP',
-                            'ano': timezone.now().year
-                        }
                         mensagem_html = render_to_string('emails/despacho_email.html', email_context)
                         email_msg = EmailMessage(
                             assunto,
@@ -928,8 +941,11 @@ def detalhe_documento(request, documento_id):
                         pdf_content.seek(0)
                         email_msg.attach(pdf_content.name, pdf_content.read(), 'application/pdf')
                         email_msg.send(fail_silently=False)
+                        
+                    if documento.telefone:
+                        enviar_whatsapp_notificacao(documento.telefone, email_context)
                 except Exception as e:
-                    print(f"Erro auto-gerando PDF/Email: {e}")
+                    print(f"Erro auto-gerando PDF/Email/WhatsApp: {e}")
 
             documento.save()
 
