@@ -202,11 +202,15 @@ def enviar_whatsapp_notificacao(telefone, context=None):
         return False
         
     numero = str(telefone).strip().replace(" ", "")
+    # A API oficial do WhatsApp exige o número com código do país, sem o '+' e sem zeros à esquerda
+    if numero.startswith('+'):
+        numero = numero[1:]
+        
     if len(numero) == 9 and numero.isdigit():
         numero = f"244{numero}"
         
     phone_number_id = getattr(settings, 'WHATSAPP_PHONE_NUMBER_ID', os.getenv('WHATSAPP_PHONE_NUMBER_ID', '101884902726142'))
-    token = getattr(settings, 'WHATSAPP_TOKEN', os.getenv('WHATSAPP_TOKEN', 'EAAZAAatU6EMIBQZCwChKX7HlVdEaX77r1Yhmf6ynSthatVZAt5jZBiVwTIZBXgsLlxYovEHS5pBRRJt7LRZApYfkoDors2fANpwvOG6QHkwLeknEtW0uUXDbt1UB3SmsqlCshZBNTMfGZAL9ySQFJP9WlM35qt6aL39uSfOMXQnnNpaQ014Db7Pd1iewdfad6DRYKr1OxLyLwJgbdIPZAZCBfc6n5hZCD8cm8lld4OCO0cZB5E7lpGvPSJhCTo9FtmzwGb6j6TgrwZC1atZBMZCexB3NML1WoiIhwZDZD'))
+    token = getattr(settings, 'WHATSAPP_TOKEN', os.getenv('WHATSAPP_TOKEN', 'EAARkkJz79Y0BRAsHiT6swpGpoZBz3s8xgPcaZBy8xBb4jHK24gQWAFoEK0slb2BNZACQclfCCl2b4jMFBFGjojF5FmZAjTFeVCt239yT349t85KvjlvD1RJ42aHPZCHJidlcv7SKcxJiE0xzoZAhkapgFvLxccAlZAruerxK6YEDO8K0pxw813p40TwYESU0EMQdOKacx8jbaCXS54ZCFrdBbGtDUrYp02RMOfJjrODUm5MoaCBPRpvG0xhKo1n8c99rCPisp8LwhosHzBjNYKZBmAArG'))
     
     url = f"https://graph.facebook.com/v22.0/{phone_number_id}/messages"
     
