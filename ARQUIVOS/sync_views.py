@@ -88,9 +88,28 @@ def sync_push(request):
                 # Extrair arquivos do JSON estendido
                 files_data = body.get('files', {}).get(str(uuid_sinc), {})
 
-                # 1. Verificar se já existe (por UUID ou Fallback de Username para CustomUser)
+                # 1. Verificar se já existe por UUID
                 existing = model.objects.filter(uuid_sinc=uuid_sinc).first()
                 
+                # Fallback para Departamento (evitar erro de nome duplicado na mesma admin)
+                if not existing and model_path == 'ARQUIVOS.Departamento':
+                    admin = getattr(instance, 'administracao', None)
+                    if admin:
+                        existing = model.objects.filter(nome=instance.nome, administracao=admin).first()
+                        if existing:
+                            model.objects.filter(pk=existing.pk).update(uuid_sinc=uuid_sinc)
+                            logger.info(f'Vinculado departamento {instance.nome} por nome.')
+
+                # Fallback para Seccoes (evitar erro de nome duplicado no mesmo dept)
+                if not existing and model_path == 'ARQUIVOS.Seccoes':
+                    dept = getattr(instance, 'departamento', None)
+                    if dept:
+                        existing = model.objects.filter(nome=instance.nome, departamento=dept).first()
+                        if existing:
+                            model.objects.filter(pk=existing.pk).update(uuid_sinc=uuid_sinc)
+                            logger.info(f'Vinculada secção {instance.nome} por nome.')
+
+                # Fallback para CustomUser (evitar erro de username duplicado)
                 if not existing and model_path == 'ARQUIVOS.CustomUser':
                     existing = model.objects.filter(username=instance.username).first()
                     if existing:
@@ -172,8 +191,19 @@ def sync_push(request):
         })
 
     except Exception as e:
-        logger.error(f'Erro no sync push: {e}')
-        return JsonResponse({'error': str(e)}, status=500)
+        import traceback
+        error_msg = str(e)
+        logger.error(f'Erro no sync push: {error_msg}')
+        logger.error(traceback.format_exc())
+        
+        # Se for erro de dependência (Natural Key), reportar explicitamente
+        if 'matching query does not exist' in error_msg:
+             return JsonResponse({
+                 'error': f'Falha de integridade referencial: {error_msg}. Certifique-se de que as dependências (Admin/Dept) foram sincronizadas primeiro.',
+                 'details': error_msg
+             }, status=400) # Usar 400 em vez de 500 para erros de dados
+             
+        return JsonResponse({'error': error_msg}, status=500)
 
 
 @csrf_exempt

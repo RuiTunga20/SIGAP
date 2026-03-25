@@ -280,10 +280,10 @@ SYNC_INSTANCE_ID = os.environ.get('SYNC_INSTANCE_ID', socket.gethostname())
 # Modelos a sincronizar (ordem importa: dependências primeiro)
 SYNC_MODELS = [
     'ARQUIVOS.Administracao',
-    'ARQUIVOS.CustomUser',
     'ARQUIVOS.TipoDocumento',
     'ARQUIVOS.Departamento',
     'ARQUIVOS.Seccoes',
+    'ARQUIVOS.CustomUser',
     'ARQUIVOS.Documento',
     'ARQUIVOS.Anexo',
     'ARQUIVOS.MovimentacaoDocumento',
@@ -294,7 +294,7 @@ SYNC_MODELS = [
 ]
 
 # Tamanho do lote para envio/recebimento
-SYNC_BATCH_SIZE = int(os.environ.get('SYNC_BATCH_SIZE', '100'))
+SYNC_BATCH_SIZE = int(os.environ.get('SYNC_BATCH_SIZE', '500'))
 
 # Intervalo entre tentativas de sincronização automática (segundos)
 SYNC_INTERVAL_SECONDS = int(os.environ.get('SYNC_INTERVAL_SECONDS', '60'))

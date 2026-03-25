@@ -229,10 +229,13 @@ class Command(BaseCommand):
             return
 
         for model_path in settings.SYNC_MODELS:
-            try:
-                model = apps.get_model(model_path)
-                if not hasattr(model, 'ultima_sincronizacao'):
-                    continue
+            has_more = True
+            while has_more:
+                try:
+                    model = apps.get_model(model_path)
+                    if not hasattr(model, 'ultima_sincronizacao'):
+                        has_more = False
+                        continue
 
                 from datetime import timedelta
                 last_sync = model.objects.filter(
@@ -243,6 +246,12 @@ class Command(BaseCommand):
 
                 # Margem de segurança para lidar com variações de relógio entre os servidores
                 since_time = last_sync - timedelta(minutes=5) if last_sync else None
+
+                # Metadados base (Foundational) devem ser sempre puxados na totalidade 
+                # (ou pelo menos sem filtro temporal para garantir dependências)
+                if model_path in ['ARQUIVOS.Administracao', 'ARQUIVOS.TipoDocumento', 
+                                  'ARQUIVOS.ConfiguracaoSistema', 'ARQUIVOS.LocalArmazenamento']:
+                    since_time = None
 
                 params = {
                     'instance_id': self.instance_id,
@@ -265,7 +274,11 @@ class Command(BaseCommand):
                         data = result.get('data', '[]')
                         count = result.get('count', 0)
 
+                        # Se recebeu um lote completo, assume que pode haver mais registros a caminho
+                        has_more = (count == self.batch_size)
+
                         if count == 0:
+                            has_more = False
                             continue
 
                         self.stdout.write(f'   📦 {model_path}: a receber {count} registos...')
@@ -282,10 +295,28 @@ class Command(BaseCommand):
                                     uuid_str = str(instance.uuid_sinc)
                                     files_data = files_data_all.get(uuid_str, {})
 
-                                    # Verificar se já existe por UUID
+                                    # 1. Verificar se já existe por UUID
                                     existing = model.objects.filter(
                                         uuid_sinc=instance.uuid_sinc
                                     ).first()
+
+                                    # Fallback para Departamento (evitar erro de nome duplicado na mesma admin)
+                                    if not existing and model_path == 'ARQUIVOS.Departamento':
+                                        admin = getattr(instance, 'administracao', None)
+                                        if admin:
+                                            existing = model.objects.filter(nome=instance.nome, administracao=admin).first()
+                                            if existing:
+                                                model.objects.filter(pk=existing.pk).update(uuid_sinc=instance.uuid_sinc)
+                                                self.stdout.write(self.style.WARNING(f'   ⚠️ Departamento {instance.nome} vinculado por nome.'))
+
+                                    # Fallback para Seccoes (evitar erro de nome duplicado no mesmo dept)
+                                    if not existing and model_path == 'ARQUIVOS.Seccoes':
+                                        dept = getattr(instance, 'departamento', None)
+                                        if dept:
+                                            existing = model.objects.filter(nome=instance.nome, departamento=dept).first()
+                                            if existing:
+                                                model.objects.filter(pk=existing.pk).update(uuid_sinc=instance.uuid_sinc)
+                                                self.stdout.write(self.style.WARNING(f'   ⚠️ Secção {instance.nome} vinculada por nome.'))
 
                                     # Fallback para CustomUser (evitar erro de username duplicado)
                                     if not existing and model_path == 'ARQUIVOS.CustomUser':
@@ -369,11 +400,13 @@ class Command(BaseCommand):
                     self.stdout.write(self.style.ERROR(
                         f'   ❌ Sem conexão com o servidor central'
                     ))
+                    has_more = False
                     return
                 except requests.Timeout:
                     self.stdout.write(self.style.ERROR(
                         f'   ⏱ Timeout ao receber {model_path}'
                     ))
+                    has_more = False
 
             except LookupError:
                 self.stdout.write(self.style.ERROR(f'   ❌ Modelo {model_path} não encontrado'))
