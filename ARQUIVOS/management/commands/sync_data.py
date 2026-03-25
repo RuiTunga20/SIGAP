@@ -396,8 +396,9 @@ class Command(BaseCommand):
                     self.stdout.write(self.style.ERROR(f'   ❌ Erro inesperado em {model_path}: {e}'))
                     has_more = False
 
-            except LookupError:
-                self.stdout.write(self.style.ERROR(f'   ❌ Modelo {model_path} não encontrado'))
+                except LookupError:
+                    self.stdout.write(self.style.ERROR(f'   ❌ Modelo {model_path} não encontrado'))
+                    has_more = False
 
     def _run_daemon(self):
         """Executa sincronização continuamente em background."""
