@@ -213,10 +213,11 @@ def gerar_pdf_despacho(documento, texto_despacho, usuario_responsavel, novo_stat
 
 logger = logging.getLogger(__name__)
 
-def enviar_whatsapp_notificacao(telefone, context=None):
+def enviar_whatsapp_notificacao(telefone, context=None, pdf_file=None, pdf_name=None):
     """
     Envia uma notificação via WhatsApp utilizando a API oficial da Meta.
     O telefone deve ser válido (idealmente com indicativo 244 para Angola).
+    Se pdf_file e pdf_name forem fornecidos, anexa o PDF.
     """
     if not telefone:
         return False
@@ -237,29 +238,85 @@ def enviar_whatsapp_notificacao(telefone, context=None):
                                                   os.getenv('WHATSAPP_PHONE_NUMBER_ID', '101884902726142')))
     token = ConfigModel.get_valor('WHATSAPP_TOKEN', 
                                  getattr(settings, 'WHATSAPP_TOKEN', 
-                                         os.getenv('WHATSAPP_TOKEN', 'EAARkkJz79Y0...'))) # Mantido o default longo que estava
+                                         os.getenv('WHATSAPP_TOKEN', 'EAARkkJz79Y0...')))
     
-    # URL customizada ou fallback para Meta v22.0
+    # 1. Tentar fazer Upload da Media primeiro (se fornecido)
+    media_id = None
+    if pdf_file and pdf_name:
+        media_url = f"https://graph.facebook.com/v22.0/{phone_number_id}/media"
+        # Reset file pointer se for um ficheiro carregado em memória
+        if hasattr(pdf_file, 'seek'):
+            pdf_file.seek(0)
+            
+        files = {
+            'file': (pdf_name, pdf_file.read(), 'application/pdf')
+        }
+        data = {
+            'messaging_product': 'whatsapp'
+        }
+        
+        try:
+            # Não enviar Content-Type nas headers, requests trata disso automaticamente no files=
+            media_resp = requests.post(media_url, headers={"Authorization": f"Bearer {token}"}, files=files, data=data, timeout=15)
+            media_resp.raise_for_status()
+            media_id = media_resp.json().get('id')
+        except Exception as e:
+            logger.error(f"Erro ao carregar media no WhatsApp: {e}")
+            if hasattr(e, 'response') and getattr(e, 'response', None) is not None:
+                logger.error(f"Detalhes media upload: {e.response.text}")
+    
+    # 2. Configurar o envio da mensagem
     default_url = f"https://graph.facebook.com/v22.0/{phone_number_id}/messages"
-    url = ConfigModel.get_valor('WHATSAPP_API_URL', 
-                               getattr(settings, 'WHATSAPP_API_URL', default_url))
+    url = ConfigModel.get_valor('WHATSAPP_API_URL', getattr(settings, 'WHATSAPP_API_URL', default_url))
     
     headers = {
         "Authorization": f"Bearer {token}",
         "Content-Type": "application/json"
     }
     
-    payload = {
-        "messaging_product": "whatsapp",
-        "to": numero,
-        "type": "template",
-        "template": {
-            "name": "hello_world",
-            "language": {
-                "code": "en_US"
+    if context:
+        mensagem = (
+            f"Olá {context.get('utente', 'Utente')},\n\n"
+            f"O seu documento com o Título: *{context.get('titulo', '')}*\n"
+            f"Protocolo: *{context.get('protocolo', '')}*\n"
+            f"Encontra-se com o status: *{context.get('status', '')}*\n\n"
+            f"Atenciosamente,\n{context.get('administracao', 'Administração')}"
+        )
+        
+        if media_id:
+            payload = {
+                "messaging_product": "whatsapp",
+                "recipient_type": "individual",
+                "to": numero,
+                "type": "document",
+                "document": {
+                    "id": media_id,
+                    "caption": mensagem,
+                    "filename": pdf_name
+                }
+            }
+        else:
+            payload = {
+                "messaging_product": "whatsapp",
+                "recipient_type": "individual",
+                "to": numero,
+                "type": "text",
+                "text": {
+                    "body": mensagem
+                }
+            }
+    else:
+        payload = {
+            "messaging_product": "whatsapp",
+            "to": numero,
+            "type": "template",
+            "template": {
+                "name": "hello_world",
+                "language": {
+                    "code": "en_US"
+                }
             }
         }
-    }
     
     try:
         response = requests.post(url, headers=headers, json=payload, timeout=10)

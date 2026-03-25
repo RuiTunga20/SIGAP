@@ -891,7 +891,12 @@ def detalhe_documento(request, documento_id):
                         
                     notificou_wp = False
                     if documento.telefone:
-                        notificou_wp = enviar_whatsapp_notificacao(documento.telefone, email_context)
+                        notificou_wp = enviar_whatsapp_notificacao(
+                            documento.telefone, 
+                            email_context, 
+                            pdf_file=pdf_content, 
+                            pdf_name=pdf_content.name
+                        )
                     
                     msg_sucesso = "Despacho registado."
                     if notificou_email and notificou_wp:
@@ -989,7 +994,12 @@ def detalhe_documento(request, documento_id):
                         email_msg.send(fail_silently=False)
                         
                     if documento.telefone:
-                        enviar_whatsapp_notificacao(documento.telefone, email_context)
+                        enviar_whatsapp_notificacao(
+                            documento.telefone, 
+                            email_context, 
+                            pdf_file=pdf_content, 
+                            pdf_name=pdf_content.name
+                        )
                 except Exception as e:
                     print(f"Erro auto-gerando PDF/Email/WhatsApp: {e}")
 
@@ -2232,16 +2242,17 @@ def editar_despacho(request, movimentacao_id):
                     messages.success(request, 'Despacho corrigido e PDF regenerado com sucesso.')
                     
                     # 4. Enviar notificação de correção (opcional/simplificado)
+                    email_context = {
+                        'utente': documento.utente or "Utente",
+                        'protocolo': documento.numero_protocolo,
+                        'titulo': documento.titulo,
+                        'status': documento.get_status_display(),
+                        'administracao': request.user.administracao.nome if request.user.administracao else 'Administração SIGAP',
+                        'ano': timezone.now().year,
+                        'correcao': True
+                    }
+                    
                     if documento.email:
-                         email_context = {
-                            'utente': documento.utente or "Utente",
-                            'protocolo': documento.numero_protocolo,
-                            'titulo': documento.titulo,
-                            'status': documento.get_status_display(),
-                            'administracao': request.user.administracao.nome if request.user.administracao else 'Administração SIGAP',
-                            'ano': timezone.now().year,
-                            'correcao': True
-                        }
                          assunto = f"CORREÇÃO: Notificação de Despacho - Protocolo {documento.numero_protocolo}"
                          mensagem_html = render_to_string('emails/despacho_email.html', email_context)
                          email = EmailMessage(assunto, mensagem_html, None, [documento.email])
@@ -2249,6 +2260,14 @@ def editar_despacho(request, movimentacao_id):
                          pdf_content.seek(0)
                          email.attach(pdf_content.name, pdf_content.read(), 'application/pdf')
                          email.send(fail_silently=True)
+
+                    if documento.telefone:
+                         enviar_whatsapp_notificacao(
+                             documento.telefone, 
+                             email_context, 
+                             pdf_file=pdf_content, 
+                             pdf_name=pdf_content.name
+                         )
                 
                 except Exception as e:
                     messages.warning(request, f'Despacho salvo, mas erro ao gerar PDF: {e}')
