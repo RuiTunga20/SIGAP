@@ -239,6 +239,7 @@ def sync_pull(request):
         instance_id = request.GET.get('instance_id', '')
         model_path = request.GET.get('model', '')
         since = request.GET.get('since', '')
+        page = int(request.GET.get('page', '0'))
 
         if not model_path:
             return JsonResponse({'error': 'Campo model é obrigatório'}, status=400)
@@ -266,7 +267,9 @@ def sync_pull(request):
                 # Garante que dados criados na nuvem (sem ultima_sincronizacao) sejam sincronizados
                 queryset = queryset.filter(Q(ultima_sincronizacao__gt=since_dt) | Q(data_modificacao__gt=since_dt))
 
-        queryset = queryset[:batch_size]
+        # Paginação: usar offset baseado na página
+        offset = page * batch_size
+        queryset = queryset[offset:offset + batch_size]
         count = queryset.count()
 
         # Serialização usando Natural Keys para enviar UUIDs em vez de PKs numéricas

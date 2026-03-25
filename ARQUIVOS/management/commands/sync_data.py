@@ -230,6 +230,7 @@ class Command(BaseCommand):
 
         for model_path in settings.SYNC_MODELS:
             has_more = True
+            page = 0
             while has_more:
                 try:
                     model = apps.get_model(model_path)
@@ -257,6 +258,7 @@ class Command(BaseCommand):
                         'instance_id': self.instance_id,
                         'model': model_path,
                         'since': since_time.isoformat() if since_time else '',
+                        'page': page,
                     }
 
                     response = requests.get(
@@ -375,8 +377,9 @@ class Command(BaseCommand):
                                         pass
 
                             self.stdout.write(self.style.SUCCESS(
-                                f'   ✅ {model_path}: {count} recebidos'
+                                f'   ✅ {model_path}: {count} recebidos (página {page + 1})'
                             ))
+                            page += 1
                         except Exception as e:
                             self.stdout.write(self.style.ERROR(f'   ❌ Erro ao processar {model_path}: {e}'))
                             has_more = False # Para evitar loop infinito se houver erro de dados
