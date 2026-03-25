@@ -237,29 +237,27 @@ class Command(BaseCommand):
                         has_more = False
                         continue
 
-                from datetime import timedelta
-                last_sync = model.objects.filter(
-                    ultima_sincronizacao__isnull=False
-                ).order_by('-ultima_sincronizacao').values_list(
-                    'ultima_sincronizacao', flat=True
-                ).first()
+                    from datetime import timedelta
+                    last_sync = model.objects.filter(
+                        ultima_sincronizacao__isnull=False
+                    ).order_by('-ultima_sincronizacao').values_list(
+                        'ultima_sincronizacao', flat=True
+                    ).first()
 
-                # Margem de segurança para lidar com variações de relógio entre os servidores
-                since_time = last_sync - timedelta(minutes=5) if last_sync else None
+                    # Margem de segurança para lidar com variações de relógio entre os servidores
+                    since_time = last_sync - timedelta(minutes=5) if last_sync else None
 
-                # Metadados base (Foundational) devem ser sempre puxados na totalidade 
-                # (ou pelo menos sem filtro temporal para garantir dependências)
-                if model_path in ['ARQUIVOS.Administracao', 'ARQUIVOS.TipoDocumento', 
-                                  'ARQUIVOS.ConfiguracaoSistema', 'ARQUIVOS.LocalArmazenamento']:
-                    since_time = None
+                    # Metadados base (Foundational) devem ser sempre puxados na totalidade 
+                    if model_path in ['ARQUIVOS.Administracao', 'ARQUIVOS.TipoDocumento', 
+                                      'ARQUIVOS.ConfiguracaoSistema', 'ARQUIVOS.LocalArmazenamento']:
+                        since_time = None
 
-                params = {
-                    'instance_id': self.instance_id,
-                    'model': model_path,
-                    'since': since_time.isoformat() if since_time else '',
-                }
+                    params = {
+                        'instance_id': self.instance_id,
+                        'model': model_path,
+                        'since': since_time.isoformat() if since_time else '',
+                    }
 
-                try:
                     response = requests.get(
                         f'{self.central_url}/api/sync/pull/',
                         params=params,
@@ -274,7 +272,7 @@ class Command(BaseCommand):
                         data = result.get('data', '[]')
                         count = result.get('count', 0)
 
-                        # Se recebeu um lote completo, assume que pode haver mais registros a caminho
+                        # Se recebeu um lote completo, assume que pode haver mais registros
                         has_more = (count == self.batch_size)
 
                         if count == 0:
@@ -300,7 +298,7 @@ class Command(BaseCommand):
                                         uuid_sinc=instance.uuid_sinc
                                     ).first()
 
-                                    # Fallback para Departamento (evitar erro de nome duplicado na mesma admin)
+                                    # Fallback para Departamento
                                     if not existing and model_path == 'ARQUIVOS.Departamento':
                                         admin = getattr(instance, 'administracao', None)
                                         if admin:
@@ -309,7 +307,7 @@ class Command(BaseCommand):
                                                 model.objects.filter(pk=existing.pk).update(uuid_sinc=instance.uuid_sinc)
                                                 self.stdout.write(self.style.WARNING(f'   ⚠️ Departamento {instance.nome} vinculado por nome.'))
 
-                                    # Fallback para Seccoes (evitar erro de nome duplicado no mesmo dept)
+                                    # Fallback para Seccoes
                                     if not existing and model_path == 'ARQUIVOS.Seccoes':
                                         dept = getattr(instance, 'departamento', None)
                                         if dept:
@@ -318,42 +316,34 @@ class Command(BaseCommand):
                                                 model.objects.filter(pk=existing.pk).update(uuid_sinc=instance.uuid_sinc)
                                                 self.stdout.write(self.style.WARNING(f'   ⚠️ Secção {instance.nome} vinculada por nome.'))
 
-                                    # Fallback para CustomUser (evitar erro de username duplicado)
+                                    # Fallback para CustomUser
                                     if not existing and model_path == 'ARQUIVOS.CustomUser':
                                         existing = model.objects.filter(username=instance.username).first()
                                         if existing:
-                                            # Vincular UUID local ao UUID remoto/central
                                             model.objects.filter(pk=existing.pk).update(uuid_sinc=instance.uuid_sinc)
                                             self.stdout.write(self.style.WARNING(f'   ⚠️ Usuário {instance.username} vinculado por username.'))
 
                                     # 2. Resolução de Conflitos ou Inserção
                                     if existing:
-                                        # Estratégia: o que tem a data_modificacao mais recente vence
                                         remote_mod = getattr(instance, 'data_modificacao', None)
                                         local_mod = getattr(existing, 'data_modificacao', None)
 
                                         if not local_mod or (remote_mod and remote_mod > local_mod):
-                                            # Remoto é mais recente: Atualizar local
-                                            # Copiar campos manualmente para evitar erros de validação com PK
                                             for field in model._meta.fields:
                                                 if not field.primary_key and field.name not in ['uuid_sinc']:
                                                     setattr(existing, field.name, getattr(instance, field.name))
                                             
-                                            # Processar arquivos se houver
                                             for field_name in file_fields:
                                                 f_data = files_data.get(field_name)
                                                 if f_data:
                                                     content = base64.b64decode(f_data['content'])
                                                     getattr(existing, field_name).save(f_data['name'], ContentFile(content), save=False)
                                             
-                                            # Usar pendente_sinc=False para evitar que o save() do mixin marque como pendente
                                             existing.save(update_fields=[f.name for f in model._meta.fields if not f.primary_key] + ['pendente_sinc'])
                                             instance = existing
                                         else:
-                                            # Local é mais recente: Ignorar pull silenciosamente
                                             continue
                                     else:
-                                        # Novo registo: Inserir
                                         for field_name in file_fields:
                                             f_data = files_data.get(field_name)
                                             if f_data:
@@ -363,7 +353,7 @@ class Command(BaseCommand):
                                         instance.pendente_sinc = False
                                         instance.save()
 
-                                    # Marcar como sincronizado localmente e preservar ultima_sincronizacao do servidor
+                                    # Marcar como sincronizado localmente
                                     model.objects.filter(
                                         uuid_sinc=instance.uuid_sinc
                                     ).update(
@@ -371,41 +361,39 @@ class Command(BaseCommand):
                                         ultima_sincronizacao=timezone.now(),
                                     )
 
-                                    # --- Gatilhos de WebSocket Real-time ---
+                                    # Gatilhos Real-time
                                     try:
                                         if model_path == 'ARQUIVOS.Notificacao':
                                             group_name = f"user_{instance.usuario_id}"
                                             send_notification_sync(group_name, instance.mensagem, instance.link)
                                         elif model_path == 'ARQUIVOS.MovimentacaoDocumento':
                                             if instance.tipo_movimentacao == 'encaminhamento':
-                                                if instance.seccao_destino_id:
-                                                    group_name = f"seccao_{instance.seccao_destino_id}"
-                                                else:
-                                                    group_name = f"departamento_{instance.departamento_destino_id}"
-                                                send_pendencia_update_sync(group_name, f"Novo documento recebido via sync: {instance.documento.numero_protocolo}")
-                                    except Exception as ws_err:
-                                        self.stdout.write(self.style.WARNING(f'   ⚠️ Erro ao disparar WebSocket durante sync pull: {ws_err}'))
+                                                dest_group = f"seccao_{instance.seccao_destino_id}" if instance.seccao_destino_id else f"departamento_{instance.departamento_destino_id}"
+                                                send_pendencia_update_sync(dest_group, f"Novo documento recebido via sync: {instance.documento.numero_protocolo}")
+                                    except Exception:
+                                        pass
 
                             self.stdout.write(self.style.SUCCESS(
                                 f'   ✅ {model_path}: {count} recebidos'
                             ))
                         except Exception as e:
                             self.stdout.write(self.style.ERROR(f'   ❌ Erro ao processar {model_path}: {e}'))
+                            has_more = False # Para evitar loop infinito se houver erro de dados
                     else:
                         self.stdout.write(self.style.ERROR(
                             f'   ❌ {model_path}: erro HTTP {response.status_code}'
                         ))
+                        has_more = False
 
                 except requests.ConnectionError:
-                    self.stdout.write(self.style.ERROR(
-                        f'   ❌ Sem conexão com o servidor central'
-                    ))
+                    self.stdout.write(self.style.ERROR(f'   ❌ Sem conexão com o servidor central'))
                     has_more = False
                     return
                 except requests.Timeout:
-                    self.stdout.write(self.style.ERROR(
-                        f'   ⏱ Timeout ao receber {model_path}'
-                    ))
+                    self.stdout.write(self.style.ERROR(f'   ⏱ Timeout ao receber {model_path}'))
+                    has_more = False
+                except Exception as e:
+                    self.stdout.write(self.style.ERROR(f'   ❌ Erro inesperado em {model_path}: {e}'))
                     has_more = False
 
             except LookupError:
