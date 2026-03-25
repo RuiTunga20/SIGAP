@@ -75,7 +75,7 @@ def sync_push(request):
 
         model = apps.get_model(model_path)
         synced_uuids = []
-        skipped_uuids = []
+        skipped_records = []
         
         # Obter campos de arquivo para este modelo
         file_fields = [f.name for f in model._meta.get_fields() if isinstance(f, (FileField, ImageField))]
@@ -93,9 +93,11 @@ def sync_push(request):
                     continue
                 obj = obj_list[0]
             except Exception as deser_err:
-                # FK não encontrada — registo ignorado, será reenviado no próximo ciclo
                 uuid_val = record.get('fields', {}).get('uuid_sinc', 'desconhecido')
-                skipped_uuids.append(str(uuid_val))
+                skipped_records.append({
+                    'uuid': str(uuid_val),
+                    'error': str(deser_err)
+                })
                 logger.warning(f'Push: registo ignorado em {model_path} (uuid={uuid_val}): {deser_err}')
                 continue
 
@@ -166,7 +168,10 @@ def sync_push(request):
                                 existing.save(update_fields=update_fields)
                             except Exception as save_err:
                                 logger.error(f"Erro ao atualizar {model_path} {uuid_sinc}: {save_err}")
-                                skipped_uuids.append(str(uuid_sinc))
+                                skipped_records.append({
+                                    'uuid': str(uuid_sinc),
+                                    'error': str(save_err)
+                                })
                                 continue
                                 
                             instance = existing 
@@ -187,7 +192,10 @@ def sync_push(request):
                             instance.save()
                         except Exception as save_err:
                             logger.error(f"Erro ao inserir novo {model_path} {uuid_sinc}: {save_err}")
-                            skipped_uuids.append(str(uuid_sinc))
+                            skipped_records.append({
+                                'uuid': str(uuid_sinc),
+                                'error': str(save_err)
+                            })
                             continue
 
                     # Marcar como sincronizado e definir origem
@@ -214,18 +222,21 @@ def sync_push(request):
                         logger.warning(f"Erro ao disparar WebSocket durante sync push: {ws_err}")
 
             except Exception as record_err:
-                uuid_val = str(getattr(obj.object, 'uuid_sinc', 'desconhecido'))
-                skipped_uuids.append(uuid_val)
+                uuid_val = str(record.get('fields', {}).get('uuid_sinc', 'desconhecido'))
+                skipped_records.append({
+                    'uuid': uuid_val,
+                    'error': str(record_err)
+                })
                 logger.warning(f'Push: erro ao processar registo {model_path} (uuid={uuid_val}): {record_err}')
 
-        logger.info(f'Sync push de {instance_id}: {len(synced_uuids)} sincronizados, {len(skipped_uuids)} ignorados de {model_path}')
+        logger.info(f'Sync push de {instance_id}: {len(synced_uuids)} sincronizados, {len(skipped_records)} ignorados de {model_path}')
 
         return JsonResponse({
             'status': 'ok',
             'synced_uuids': synced_uuids,
-            'skipped_uuids': skipped_uuids,
+            'skipped_records': skipped_records, # Novo formato detalhado
             'count': len(synced_uuids),
-            'skipped': len(skipped_uuids),
+            'skipped': len(skipped_records),
         })
 
     except Exception as e:
