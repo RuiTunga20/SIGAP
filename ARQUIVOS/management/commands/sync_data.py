@@ -190,6 +190,7 @@ class Command(BaseCommand):
                         result = response.json()
                         # Marcar APENAS os registos que foram aceites (não os skipped)
                         synced_uuids = result.get('synced_uuids', [])
+                        skipped_records = result.get('skipped_records', [])
                         skipped_count = result.get('skipped', 0)
                         now = timezone.now()
                         if synced_uuids:
@@ -201,7 +202,11 @@ class Command(BaseCommand):
                             )
                         msg = f'   ✅ {model_path}: {len(synced_uuids)} sincronizados'
                         if skipped_count:
-                            msg += f' | {skipped_count} ignorados (dependências em falta no servidor)'
+                            msg += f' | {skipped_count} ignorados'
+                            for skip in skipped_records[:5]: # Mostrar apenas os primeiros 5 para não inundar o log
+                                msg += f'\n      ⚠️ {skip.get("uuid")}: {skip.get("error")}'
+                            if skipped_count > 5:
+                                msg += f'\n      ... e mais {skipped_count - 5} outros.'
                         self.stdout.write(self.style.SUCCESS(msg))
                     else:
                         self.stdout.write(self.style.ERROR(
@@ -279,8 +284,9 @@ class Command(BaseCommand):
                 since_time = last_sync - timedelta(minutes=5) if last_sync else None
 
                 # Metadados base (Foundational) devem ser sempre puxados na totalidade 
+                # Adicionado CustomUser para garantir que todos os usuários existam localmente para FKs
                 if model_path in ['ARQUIVOS.Administracao', 'ARQUIVOS.TipoDocumento', 
-                                  'ARQUIVOS.Departamento', 'ARQUIVOS.Seccoes',
+                                  'ARQUIVOS.Departamento', 'ARQUIVOS.Seccoes', 'ARQUIVOS.CustomUser',
                                   'ARQUIVOS.ConfiguracaoSistema', 'ARQUIVOS.LocalArmazenamento']:
                     since_time = None
 
@@ -305,8 +311,9 @@ class Command(BaseCommand):
                     data = result.get('data', '[]')
                     count = result.get('count', 0)
 
-                    # Se recebeu um lote completo, assume que pode haver mais registros
-                    has_more = (count == self.batch_size)
+                    # ROBUSTEZ: Continuar enquanto houver registos, independentemente de batch_size
+                    # Isso evita parar se o servidor tiver um limite menor que o cliente
+                    has_more = (count > 0)
 
                     if count == 0:
                         has_more = False

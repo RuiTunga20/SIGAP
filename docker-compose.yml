@@ -16,8 +16,8 @@ services:
       - DATABASE_URL=postgres://sga_user:sga_password@db:5432/sga_db
       - REDIS_URL=redis://redis:6379/0
       - DJANGO_SETTINGS_MODULE=SGA.settings
-      - SYNC_CENTRAL_URL=${SYNC_CENTRAL_URL:-}
-      - SYNC_AUTH_TOKEN=${SYNC_AUTH_TOKEN:-}
+      - SYNC_CENTRAL_URL=https://sigap-1.onrender.com
+      - SYNC_AUTH_TOKEN=b2e87eea2311d158e7f3e04120eef18e8a1a261fa3f1042badb34bb1bfb6eec3
       - EMAIL_HOST=mail.bryzzafood.com
       - EMAIL_PORT=465
       - EMAIL_USE_TLS=False
@@ -111,8 +111,8 @@ services:
       - DATABASE_URL=postgres://sga_user:sga_password@db:5432/sga_db
       - REDIS_URL=redis://redis:6379/0
       - DJANGO_SETTINGS_MODULE=SGA.settings
-      - SYNC_CENTRAL_URL=${SYNC_CENTRAL_URL:-}
-      - SYNC_AUTH_TOKEN=${SYNC_AUTH_TOKEN:-}
+      - SYNC_CENTRAL_URL=https://sigap-1.onrender.com
+      - SYNC_AUTH_TOKEN=b2e87eea2311d158e7f3e04120eef18e8a1a261fa3f1042badb34bb1bfb6eec3
       - SYNC_INSTANCE_ID=sigap_local_v1
     volumes:
       - .:/app
