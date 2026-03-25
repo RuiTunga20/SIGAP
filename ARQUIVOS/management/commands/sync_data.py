@@ -23,6 +23,7 @@ from django.core.management.base import BaseCommand, CommandError
 from django.conf import settings
 from django.apps import apps
 from django.core.serializers import serialize, deserialize
+from ARQUIVOS.models.sistema import ConfiguracaoSistema
 from django.utils import timezone
 from django.db import transaction
 
@@ -51,8 +52,11 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
-        self.central_url = settings.SYNC_CENTRAL_URL
-        self.auth_token = settings.SYNC_AUTH_TOKEN
+        # Tentar obter do Banco de Dados primeiro (ConfiguracaoSistema)
+        self.central_url = ConfiguracaoSistema.get_valor('SYNC_CENTRAL_URL', settings.SYNC_CENTRAL_URL)
+        self.auth_token = ConfiguracaoSistema.get_valor('SYNC_AUTH_TOKEN', settings.SYNC_AUTH_TOKEN)
+        
+        # O ID da instância e o tamanho do lote geralmente permanecem em settings/env
         self.instance_id = settings.SYNC_INSTANCE_ID
         self.batch_size = settings.SYNC_BATCH_SIZE
 

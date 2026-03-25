@@ -24,7 +24,7 @@ from django.core.files.base import ContentFile
 from django.db.models import Q, FileField, ImageField
 from ARQUIVOS.consumers import send_notification_sync, send_pendencia_update_sync
 from ARQUIVOS.sincronizacao import exportar_pacote, importar_pacote, marcar_como_sincronizado
-from ARQUIVOS.sincronizacao import exportar_pacote, importar_pacote, marcar_como_sincronizado
+from ARQUIVOS.models.sistema import ConfiguracaoSistema
 
 logger = logging.getLogger('sync')
 
@@ -34,7 +34,9 @@ def sync_auth_required(view_func):
     @wraps(view_func)
     def wrapper(request, *args, **kwargs):
         auth_header = request.headers.get('Authorization', '')
-        expected_token = settings.SYNC_AUTH_TOKEN
+        # Tenta obter do banco de dados de forma robusta
+        ConfigModel = apps.get_model('ARQUIVOS', 'ConfiguracaoSistema')
+        expected_token = ConfigModel.get_valor('SYNC_AUTH_TOKEN', settings.SYNC_AUTH_TOKEN)
 
         if not expected_token:
             return JsonResponse(
@@ -42,7 +44,7 @@ def sync_auth_required(view_func):
                 status=503
             )
 
-        if auth_header != f'Token {expected_token}':
+        if auth_header != f"Token {expected_token}":
             return JsonResponse({'error': 'Token de autenticação inválido'}, status=401)
 
         return view_func(request, *args, **kwargs)

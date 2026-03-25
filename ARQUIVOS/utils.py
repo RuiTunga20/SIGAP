@@ -229,10 +229,20 @@ def enviar_whatsapp_notificacao(telefone, context=None):
     if len(numero) == 9 and numero.isdigit():
         numero = f"244{numero}"
         
-    phone_number_id = getattr(settings, 'WHATSAPP_PHONE_NUMBER_ID', os.getenv('WHATSAPP_PHONE_NUMBER_ID', '101884902726142'))
-    token = getattr(settings, 'WHATSAPP_TOKEN', os.getenv('WHATSAPP_TOKEN', 'EAARkkJz79Y0BRAsHiT6swpGpoZBz3s8xgPcaZBy8xBb4jHK24gQWAFoEK0slb2BNZACQclfCCl2b4jMFBFGjojF5FmZAjTFeVCt239yT349t85KvjlvD1RJ42aHPZCHJidlcv7SKcxJiE0xzoZAhkapgFvLxccAlZAruerxK6YEDO8K0pxw813p40TwYESU0EMQdOKacx8jbaCXS54ZCFrdBbGtDUrYp02RMOfJjrODUm5MoaCBPRpvG0xhKo1n8c99rCPisp8LwhosHzBjNYKZBmAArG'))
+    from django.apps import apps
+    ConfigModel = apps.get_model('ARQUIVOS', 'ConfiguracaoSistema')
     
-    url = f"https://graph.facebook.com/v22.0/{phone_number_id}/messages"
+    phone_number_id = ConfigModel.get_valor('WHATSAPP_PHONE_NUMBER_ID', 
+                                          getattr(settings, 'WHATSAPP_PHONE_NUMBER_ID', 
+                                                  os.getenv('WHATSAPP_PHONE_NUMBER_ID', '101884902726142')))
+    token = ConfigModel.get_valor('WHATSAPP_TOKEN', 
+                                 getattr(settings, 'WHATSAPP_TOKEN', 
+                                         os.getenv('WHATSAPP_TOKEN', 'EAARkkJz79Y0...'))) # Mantido o default longo que estava
+    
+    # URL customizada ou fallback para Meta v22.0
+    default_url = f"https://graph.facebook.com/v22.0/{phone_number_id}/messages"
+    url = ConfigModel.get_valor('WHATSAPP_API_URL', 
+                               getattr(settings, 'WHATSAPP_API_URL', default_url))
     
     headers = {
         "Authorization": f"Bearer {token}",

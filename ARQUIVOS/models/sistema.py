@@ -11,6 +11,18 @@ class ConfiguracaoSistema(SyncMixin):
     descricao = models.TextField(blank=True)
     ativo = models.BooleanField(default=True)
 
+    @classmethod
+    def get_valor(cls, chave, default=None):
+        """
+        Retorna o valor de uma configuração pela chave.
+        Se não existir ou estiver inativa, retorna o default.
+        """
+        try:
+            config = cls.objects.get(chave=chave, ativo=True)
+            return config.valor
+        except cls.DoesNotExist:
+            return default
+
     def __str__(self):
         return f"{self.chave}: {self.valor}"
 
