@@ -268,8 +268,9 @@ def sync_pull(request):
                 queryset = queryset.filter(Q(ultima_sincronizacao__gt=since_dt) | Q(data_modificacao__gt=since_dt))
 
         # Paginação: usar offset baseado na página
+        # IMPORTANTE: order_by garante ordem consistente entre páginas
         offset = page * batch_size
-        queryset = queryset[offset:offset + batch_size]
+        queryset = queryset.order_by('pk')[offset:offset + batch_size]
         count = queryset.count()
 
         # Serialização usando Natural Keys para enviar UUIDs em vez de PKs numéricas

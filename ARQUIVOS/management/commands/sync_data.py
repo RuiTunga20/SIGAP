@@ -290,8 +290,24 @@ class Command(BaseCommand):
                                 files_data_all = result.get('files', {})
                                 file_fields = [f.name for f in model._meta.get_fields() if isinstance(f, (FileField, ImageField))]
 
-                                # Deserializar usando Natural Keys para resolver FKs via UUID
-                                for obj in deserialize('json', data, use_natural_foreign_keys=True):
+                                # Deserializar CADA registo individualmente para não perder todo o lote se um falhar
+                                import json as json_module
+                                records = json_module.loads(data)
+                                skipped = 0
+                                for record in records:
+                                    try:
+                                        single_json = json_module.dumps([record])
+                                        obj_list = list(deserialize('json', single_json, use_natural_foreign_keys=True))
+                                        if not obj_list:
+                                            continue
+                                        obj = obj_list[0]
+                                    except Exception as deser_err:
+                                        skipped += 1
+                                        self.stdout.write(self.style.WARNING(
+                                            f'   ⚠️ Registo ignorado em {model_path}: {deser_err}'
+                                        ))
+                                        continue
+
                                     instance = obj.object
                                     uuid_str = str(instance.uuid_sinc)
                                     files_data = files_data_all.get(uuid_str, {})
@@ -376,9 +392,10 @@ class Command(BaseCommand):
                                     except Exception:
                                         pass
 
-                            self.stdout.write(self.style.SUCCESS(
-                                f'   ✅ {model_path}: {count} recebidos (página {page + 1})'
-                            ))
+                            msg = f'   ✅ {model_path}: {count - skipped} recebidos (página {page + 1})'
+                            if skipped:
+                                msg += f' | {skipped} ignorados (dependências em falta)'
+                            self.stdout.write(self.style.SUCCESS(msg))
                             page += 1
                         except Exception as e:
                             self.stdout.write(self.style.ERROR(f'   ❌ Erro ao processar {model_path}: {e}'))
