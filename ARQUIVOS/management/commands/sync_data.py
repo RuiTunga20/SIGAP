@@ -188,18 +188,21 @@ class Command(BaseCommand):
 
                     if response.status_code == 200:
                         result = response.json()
-                        # Marcar como sincronizados
+                        # Marcar APENAS os registos que foram aceites (não os skipped)
                         synced_uuids = result.get('synced_uuids', [])
+                        skipped_count = result.get('skipped', 0)
                         now = timezone.now()
-                        model.objects.filter(
-                            uuid_sinc__in=synced_uuids
-                        ).update(
-                            pendente_sinc=False,
-                            ultima_sincronizacao=now,
-                        )
-                        self.stdout.write(self.style.SUCCESS(
-                            f'   ✅ {model_path}: {len(synced_uuids)} sincronizados'
-                        ))
+                        if synced_uuids:
+                            model.objects.filter(
+                                uuid_sinc__in=synced_uuids
+                            ).update(
+                                pendente_sinc=False,
+                                ultima_sincronizacao=now,
+                            )
+                        msg = f'   ✅ {model_path}: {len(synced_uuids)} sincronizados'
+                        if skipped_count:
+                            msg += f' | {skipped_count} ignorados (dependências em falta no servidor)'
+                        self.stdout.write(self.style.SUCCESS(msg))
                     else:
                         self.stdout.write(self.style.ERROR(
                             f'   ❌ {model_path}: erro HTTP {response.status_code}'
@@ -228,86 +231,113 @@ class Command(BaseCommand):
             ))
             return
 
+        # Coleccionar modelos com registos ignorados para uma segunda passagem
+        models_to_retry = []
+
         for model_path in settings.SYNC_MODELS:
-            has_more = True
-            page = 0
-            while has_more:
-                try:
-                    model = apps.get_model(model_path)
-                    if not hasattr(model, 'ultima_sincronizacao'):
+            skipped_total = self._pull_model(model_path)
+            if skipped_total > 0:
+                models_to_retry.append((model_path, skipped_total))
+
+        # --- SEGUNDA PASSAGEM: Re-tentar modelos com dependências em falta ---
+        # Depois de todos os modelos base terem sido puxados, as dependências
+        # que faltavam na 1ª passagem podem agora existir localmente.
+        if models_to_retry:
+            self.stdout.write(self.style.HTTP_INFO(
+                f'\n🔄 Segunda passagem: a re-tentar {len(models_to_retry)} modelos com registos ignorados...'
+            ))
+            for model_path, prev_skipped in models_to_retry:
+                skipped = self._pull_model(model_path)
+                if skipped > 0:
+                    self.stdout.write(self.style.WARNING(
+                        f'   ⚠️ {model_path}: ainda restam {skipped} registos com dependências em falta'
+                    ))
+                else:
+                    self.stdout.write(self.style.SUCCESS(
+                        f'   ✅ {model_path}: todos os {prev_skipped} registos anteriormente ignorados foram importados com sucesso!'
+                    ))
+
+    def _pull_model(self, model_path):
+        """Puxa um modelo específico do servidor. Retorna o total de registos ignorados."""
+        total_skipped = 0
+        has_more = True
+        page = 0
+        while has_more:
+            try:
+                model = apps.get_model(model_path)
+                if not hasattr(model, 'ultima_sincronizacao'):
+                    return 0
+
+                from datetime import timedelta
+                last_sync = model.objects.filter(
+                    ultima_sincronizacao__isnull=False
+                ).order_by('-ultima_sincronizacao').values_list(
+                    'ultima_sincronizacao', flat=True
+                ).first()
+
+                # Margem de segurança para lidar com variações de relógio entre os servidores
+                since_time = last_sync - timedelta(minutes=5) if last_sync else None
+
+                # Metadados base (Foundational) devem ser sempre puxados na totalidade 
+                if model_path in ['ARQUIVOS.Administracao', 'ARQUIVOS.TipoDocumento', 
+                                  'ARQUIVOS.Departamento', 'ARQUIVOS.Seccoes',
+                                  'ARQUIVOS.ConfiguracaoSistema', 'ARQUIVOS.LocalArmazenamento']:
+                    since_time = None
+
+                params = {
+                    'instance_id': self.instance_id,
+                    'model': model_path,
+                    'since': since_time.isoformat() if since_time else '',
+                    'page': page,
+                }
+
+                response = requests.get(
+                    f'{self.central_url}/api/sync/pull/',
+                    params=params,
+                    headers={
+                        'Authorization': f'Token {self.auth_token}',
+                    },
+                    timeout=30,
+                )
+
+                if response.status_code == 200:
+                    result = response.json()
+                    data = result.get('data', '[]')
+                    count = result.get('count', 0)
+
+                    # Se recebeu um lote completo, assume que pode haver mais registros
+                    has_more = (count == self.batch_size)
+
+                    if count == 0:
                         has_more = False
                         continue
 
-                    from datetime import timedelta
-                    last_sync = model.objects.filter(
-                        ultima_sincronizacao__isnull=False
-                    ).order_by('-ultima_sincronizacao').values_list(
-                        'ultima_sincronizacao', flat=True
-                    ).first()
+                    self.stdout.write(f'   📦 {model_path}: a receber {count} registos...')
 
-                    # Margem de segurança para lidar com variações de relógio entre os servidores
-                    since_time = last_sync - timedelta(minutes=5) if last_sync else None
+                    # Deserializar e salvar — REGISTO A REGISTO com transaction individual
+                    try:
+                        files_data_all = result.get('files', {})
+                        file_fields = [f.name for f in model._meta.get_fields() if isinstance(f, (FileField, ImageField))]
 
-                    # Metadados base (Foundational) devem ser sempre puxados na totalidade 
-                    if model_path in ['ARQUIVOS.Administracao', 'ARQUIVOS.TipoDocumento', 
-                                      'ARQUIVOS.Departamento', 'ARQUIVOS.Seccoes',
-                                      'ARQUIVOS.ConfiguracaoSistema', 'ARQUIVOS.LocalArmazenamento']:
-                        since_time = None
+                        import json as json_module
+                        records = json_module.loads(data)
+                        skipped = 0
+                        for record in records:
+                            try:
+                                single_json = json_module.dumps([record])
+                                obj_list = list(deserialize('json', single_json, use_natural_foreign_keys=True))
+                                if not obj_list:
+                                    continue
+                                obj = obj_list[0]
+                            except Exception as deser_err:
+                                skipped += 1
+                                self.stdout.write(self.style.WARNING(
+                                    f'   ⚠️ Registo ignorado em {model_path}: {deser_err}'
+                                ))
+                                continue
 
-                    params = {
-                        'instance_id': self.instance_id,
-                        'model': model_path,
-                        'since': since_time.isoformat() if since_time else '',
-                        'page': page,
-                    }
-
-                    response = requests.get(
-                        f'{self.central_url}/api/sync/pull/',
-                        params=params,
-                        headers={
-                            'Authorization': f'Token {self.auth_token}',
-                        },
-                        timeout=30,
-                    )
-
-                    if response.status_code == 200:
-                        result = response.json()
-                        data = result.get('data', '[]')
-                        count = result.get('count', 0)
-
-                        # Se recebeu um lote completo, assume que pode haver mais registros
-                        has_more = (count == self.batch_size)
-
-                        if count == 0:
-                            has_more = False
-                            continue
-
-                        self.stdout.write(f'   📦 {model_path}: a receber {count} registos...')
-
-                        # Deserializar e salvar
-                        try:
-                            with transaction.atomic():
-                                files_data_all = result.get('files', {})
-                                file_fields = [f.name for f in model._meta.get_fields() if isinstance(f, (FileField, ImageField))]
-
-                                # Deserializar CADA registo individualmente para não perder todo o lote se um falhar
-                                import json as json_module
-                                records = json_module.loads(data)
-                                skipped = 0
-                                for record in records:
-                                    try:
-                                        single_json = json_module.dumps([record])
-                                        obj_list = list(deserialize('json', single_json, use_natural_foreign_keys=True))
-                                        if not obj_list:
-                                            continue
-                                        obj = obj_list[0]
-                                    except Exception as deser_err:
-                                        skipped += 1
-                                        self.stdout.write(self.style.WARNING(
-                                            f'   ⚠️ Registo ignorado em {model_path}: {deser_err}'
-                                        ))
-                                        continue
-
+                            try:
+                                with transaction.atomic():
                                     instance = obj.object
                                     uuid_str = str(instance.uuid_sinc)
                                     files_data = files_data_all.get(uuid_str, {})
@@ -392,34 +422,41 @@ class Command(BaseCommand):
                                     except Exception:
                                         pass
 
-                            msg = f'   ✅ {model_path}: {count - skipped} recebidos (página {page + 1})'
-                            if skipped:
-                                msg += f' | {skipped} ignorados (dependências em falta)'
-                            self.stdout.write(self.style.SUCCESS(msg))
-                            page += 1
-                        except Exception as e:
-                            self.stdout.write(self.style.ERROR(f'   ❌ Erro ao processar {model_path}: {e}'))
-                            has_more = False # Para evitar loop infinito se houver erro de dados
-                    else:
-                        self.stdout.write(self.style.ERROR(
-                            f'   ❌ {model_path}: erro HTTP {response.status_code}'
-                        ))
+                            except Exception as record_err:
+                                skipped += 1
+                                self.stdout.write(self.style.WARNING(
+                                    f'   ⚠️ Erro ao guardar registo em {model_path}: {record_err}'
+                                ))
+
+                        total_skipped += skipped
+                        msg = f'   ✅ {model_path}: {count - skipped} recebidos (página {page + 1})'
+                        if skipped:
+                            msg += f' | {skipped} ignorados (dependências em falta)'
+                        self.stdout.write(self.style.SUCCESS(msg))
+                        page += 1
+                    except Exception as e:
+                        self.stdout.write(self.style.ERROR(f'   ❌ Erro ao processar {model_path}: {e}'))
                         has_more = False
-
-                except requests.ConnectionError:
-                    self.stdout.write(self.style.ERROR(f'   ❌ Sem conexão com o servidor central'))
-                    has_more = False
-                    return
-                except requests.Timeout:
-                    self.stdout.write(self.style.ERROR(f'   ⏱ Timeout ao receber {model_path}'))
-                    has_more = False
-                except Exception as e:
-                    self.stdout.write(self.style.ERROR(f'   ❌ Erro inesperado em {model_path}: {e}'))
+                else:
+                    self.stdout.write(self.style.ERROR(
+                        f'   ❌ {model_path}: erro HTTP {response.status_code}'
+                    ))
                     has_more = False
 
-                except LookupError:
-                    self.stdout.write(self.style.ERROR(f'   ❌ Modelo {model_path} não encontrado'))
-                    has_more = False
+            except requests.ConnectionError:
+                self.stdout.write(self.style.ERROR(f'   ❌ Sem conexão com o servidor central'))
+                return total_skipped
+            except requests.Timeout:
+                self.stdout.write(self.style.ERROR(f'   ⏱ Timeout ao receber {model_path}'))
+                has_more = False
+            except LookupError:
+                self.stdout.write(self.style.ERROR(f'   ❌ Modelo {model_path} não encontrado'))
+                has_more = False
+            except Exception as e:
+                self.stdout.write(self.style.ERROR(f'   ❌ Erro inesperado em {model_path}: {e}'))
+                has_more = False
+
+        return total_skipped
 
     def _run_daemon(self):
         """Executa sincronização continuamente em background."""

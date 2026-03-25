@@ -75,137 +75,157 @@ def sync_push(request):
 
         model = apps.get_model(model_path)
         synced_uuids = []
+        skipped_uuids = []
         
         # Obter campos de arquivo para este modelo
         file_fields = [f.name for f in model._meta.get_fields() if isinstance(f, (FileField, ImageField))]
 
-        with transaction.atomic():
-            # Deserializar usando Natural Keys para resolver FKs via UUID
-            for obj in deserialize('json', data, use_natural_foreign_keys=True):
-                instance = obj.object
-                uuid_sinc = instance.uuid_sinc
+        # Deserializar REGISTO A REGISTO para não perder todo o lote se um falhar
+        import json as json_module
+        records = json_module.loads(data)
 
-                # Extrair arquivos do JSON estendido
-                files_data = body.get('files', {}).get(str(uuid_sinc), {})
+        for record in records:
+            # Deserializar individualmente usando Natural Keys
+            try:
+                single_json = json_module.dumps([record])
+                obj_list = list(deserialize('json', single_json, use_natural_foreign_keys=True))
+                if not obj_list:
+                    continue
+                obj = obj_list[0]
+            except Exception as deser_err:
+                # FK não encontrada — registo ignorado, será reenviado no próximo ciclo
+                uuid_val = record.get('fields', {}).get('uuid_sinc', 'desconhecido')
+                skipped_uuids.append(str(uuid_val))
+                logger.warning(f'Push: registo ignorado em {model_path} (uuid={uuid_val}): {deser_err}')
+                continue
 
-                # 1. Verificar se já existe por UUID
-                existing = model.objects.filter(uuid_sinc=uuid_sinc).first()
-                
-                # Fallback para Administracao (evitar erro de UUID diferente para mesma admin)
-                if not existing and model_path == 'ARQUIVOS.Administracao':
-                    existing = model.objects.filter(nome=instance.nome).first()
-                    if existing:
-                        model.objects.filter(pk=existing.pk).update(uuid_sinc=uuid_sinc)
-                        logger.info(f'Vinculada administração {instance.nome} por nome e atualizado UUID.')
+            try:
+                with transaction.atomic():
+                    instance = obj.object
+                    uuid_sinc = instance.uuid_sinc
 
-                # Fallback para Departamento (evitar erro de nome duplicado na mesma admin)
-                if not existing and model_path == 'ARQUIVOS.Departamento':
-                    admin = getattr(instance, 'administracao', None)
-                    if admin:
-                        existing = model.objects.filter(nome=instance.nome, administracao=admin).first()
+                    # Extrair arquivos do JSON estendido
+                    files_data = body.get('files', {}).get(str(uuid_sinc), {})
+
+                    # 1. Verificar se já existe por UUID
+                    existing = model.objects.filter(uuid_sinc=uuid_sinc).first()
+                    
+                    # Fallback para Administracao (evitar erro de UUID diferente para mesma admin)
+                    if not existing and model_path == 'ARQUIVOS.Administracao':
+                        existing = model.objects.filter(nome=instance.nome).first()
                         if existing:
                             model.objects.filter(pk=existing.pk).update(uuid_sinc=uuid_sinc)
-                            logger.info(f'Vinculado departamento {instance.nome} por nome.')
+                            logger.info(f'Vinculada administração {instance.nome} por nome e atualizado UUID.')
 
-                # Fallback para Seccoes (evitar erro de nome duplicado no mesmo dept)
-                if not existing and model_path == 'ARQUIVOS.Seccoes':
-                    dept = getattr(instance, 'departamento', None)
-                    if dept:
-                        existing = model.objects.filter(nome=instance.nome, departamento=dept).first()
+                    # Fallback para Departamento (evitar erro de nome duplicado na mesma admin)
+                    if not existing and model_path == 'ARQUIVOS.Departamento':
+                        admin = getattr(instance, 'administracao', None)
+                        if admin:
+                            existing = model.objects.filter(nome=instance.nome, administracao=admin).first()
+                            if existing:
+                                model.objects.filter(pk=existing.pk).update(uuid_sinc=uuid_sinc)
+                                logger.info(f'Vinculado departamento {instance.nome} por nome.')
+
+                    # Fallback para Seccoes (evitar erro de nome duplicado no mesmo dept)
+                    if not existing and model_path == 'ARQUIVOS.Seccoes':
+                        dept = getattr(instance, 'departamento', None)
+                        if dept:
+                            existing = model.objects.filter(nome=instance.nome, departamento=dept).first()
+                            if existing:
+                                model.objects.filter(pk=existing.pk).update(uuid_sinc=uuid_sinc)
+                                logger.info(f'Vinculada secção {instance.nome} por nome.')
+
+                    # Fallback para CustomUser (evitar erro de username duplicado)
+                    if not existing and model_path == 'ARQUIVOS.CustomUser':
+                        existing = model.objects.filter(username=instance.username).first()
                         if existing:
                             model.objects.filter(pk=existing.pk).update(uuid_sinc=uuid_sinc)
-                            logger.info(f'Vinculada secção {instance.nome} por nome.')
+                            logger.info(f'Vinculado usuário {instance.username} por username e atualizado UUID.')
 
-                # Fallback para CustomUser (evitar erro de username duplicado)
-                if not existing and model_path == 'ARQUIVOS.CustomUser':
-                    existing = model.objects.filter(username=instance.username).first()
+                    # 2. Resolução de Conflitos ou Inserção
                     if existing:
-                        model.objects.filter(pk=existing.pk).update(uuid_sinc=uuid_sinc)
-                        logger.info(f'Vinculado usuário {instance.username} por username e atualizado UUID.')
+                        # Estratégia: o que tem a data_modificacao mais recente vence
+                        remote_mod = getattr(instance, 'data_modificacao', None)
+                        local_mod = getattr(existing, 'data_modificacao', None)
 
-                # 2. Resolução de Conflitos ou Inserção
-                if existing:
-                    # Estratégia: o que tem a data_modificacao mais recente vence
-                    remote_mod = getattr(instance, 'data_modificacao', None)
-                    local_mod = getattr(existing, 'data_modificacao', None)
-
-                    if not local_mod or (remote_mod and remote_mod > local_mod):
-                        # Remoto é mais recente: Atualizar local
-                        # Em vez de converter PK, copiamos os campos para o objeto existente
-                        # Isto evita erros de validação (full_clean) com chaves únicas/IDs
-                        for field in model._meta.fields:
-                            # Não copiar PK nem uuid_sinc
-                            if not field.primary_key and field.name not in ['uuid_sinc']:
-                                setattr(existing, field.name, getattr(instance, field.name))
-                        
-                        # Processar arquivos se houver
+                        if not local_mod or (remote_mod and remote_mod > local_mod):
+                            # Remoto é mais recente: Atualizar local
+                            for field in model._meta.fields:
+                                if not field.primary_key and field.name not in ['uuid_sinc']:
+                                    setattr(existing, field.name, getattr(instance, field.name))
+                            
+                            # Processar arquivos se houver
+                            for field_name in file_fields:
+                                field_data = files_data.get(field_name)
+                                if field_data:
+                                    content = base64.b64decode(field_data['content'])
+                                    getattr(existing, field_name).save(field_data['name'], ContentFile(content), save=False)
+                            
+                            try:
+                                update_fields = [f.name for f in model._meta.fields if not f.primary_key and not isinstance(f, (FileField, ImageField))] + ['pendente_sinc']
+                                existing.save(update_fields=update_fields)
+                            except Exception as save_err:
+                                logger.error(f"Erro ao atualizar {model_path} {uuid_sinc}: {save_err}")
+                                skipped_uuids.append(str(uuid_sinc))
+                                continue
+                                
+                            instance = existing 
+                        else:
+                            logger.debug(f'Ignorado push de {uuid_sinc}: versão local é mais recente.')
+                            synced_uuids.append(str(uuid_sinc))
+                            continue
+                    else:
+                        # Novo registo: Inserir
                         for field_name in file_fields:
                             field_data = files_data.get(field_name)
                             if field_data:
                                 content = base64.b64decode(field_data['content'])
-                                getattr(existing, field_name).save(field_data['name'], ContentFile(content), save=False)
+                                getattr(instance, field_name).save(field_data['name'], ContentFile(content), save=False)
                         
-                        # Guardar o objeto existente (faz o UPDATE)
-                        # Usamos pendente_sinc=False para evitar que o save() do mixin marque como pendente
+                        instance.pendente_sinc = False
                         try:
-                            update_fields = [f.name for f in model._meta.fields if not f.primary_key and not isinstance(f, (FileField, ImageField))] + ['pendente_sinc']
-                            existing.save(update_fields=update_fields)
+                            instance.save()
                         except Exception as save_err:
-                            logger.error(f"Erro ao atualizar {model_path} {uuid_sinc}: {save_err}")
-                            raise save_err
-                            
-                        # Vincular instance ao existente para uso nos gatilhos de WS abaixo
-                        instance = existing 
-                    else:
-                        # Local é mais recente: Ignorar push silenciosamente
-                        logger.debug(f'Ignorado push de {uuid_sinc}: versão local é mais recente.')
-                        synced_uuids.append(str(uuid_sinc))
-                        continue
-                else:
-                    # Novo registo: Inserir
-                    for field_name in file_fields:
-                        field_data = files_data.get(field_name)
-                        if field_data:
-                            content = base64.b64decode(field_data['content'])
-                            getattr(instance, field_name).save(field_data['name'], ContentFile(content), save=False)
-                    
-                    instance.pendente_sinc = False
+                            logger.error(f"Erro ao inserir novo {model_path} {uuid_sinc}: {save_err}")
+                            skipped_uuids.append(str(uuid_sinc))
+                            continue
+
+                    # Marcar como sincronizado e definir origem
+                    model.objects.filter(uuid_sinc=uuid_sinc).update(
+                        pendente_sinc=False,
+                        ultima_sincronizacao=timezone.now(),
+                        origem_instancia=instance_id,
+                    )
+                    synced_uuids.append(str(uuid_sinc))
+
+                    # --- Gatilhos de WebSocket Real-time ---
                     try:
-                        instance.save()
-                    except Exception as save_err:
-                        logger.error(f"Erro ao inserir novo {model_path} {uuid_sinc}: {save_err}")
-                        raise save_err
+                        if model_path == 'ARQUIVOS.Notificacao':
+                            group_name = f"user_{instance.usuario_id}"
+                            send_notification_sync(group_name, instance.mensagem, instance.link)
+                        elif model_path == 'ARQUIVOS.MovimentacaoDocumento':
+                            if instance.tipo_movimentacao == 'encaminhamento':
+                                if instance.seccao_destino_id:
+                                    group_name = f"seccao_{instance.seccao_destino_id}"
+                                else:
+                                    group_name = f"departamento_{instance.departamento_destino_id}"
+                                send_pendencia_update_sync(group_name, f"Novo documento recebido: {instance.documento.numero_protocolo}")
+                    except Exception as ws_err:
+                        logger.warning(f"Erro ao disparar WebSocket durante sync push: {ws_err}")
 
-                # Marcar como sincronizado e definir origem
-                model.objects.filter(uuid_sinc=uuid_sinc).update(
-                    pendente_sinc=False,
-                    ultima_sincronizacao=timezone.now(),
-                    origem_instancia=instance_id,
-                )
-                synced_uuids.append(str(uuid_sinc))
+            except Exception as record_err:
+                uuid_val = str(getattr(obj.object, 'uuid_sinc', 'desconhecido'))
+                skipped_uuids.append(uuid_val)
+                logger.warning(f'Push: erro ao processar registo {model_path} (uuid={uuid_val}): {record_err}')
 
-                # --- Gatilhos de WebSocket Real-time ---
-                try:
-                    if model_path == 'ARQUIVOS.Notificacao':
-                        group_name = f"user_{instance.usuario_id}"
-                        send_notification_sync(group_name, instance.mensagem, instance.link)
-                    elif model_path == 'ARQUIVOS.MovimentacaoDocumento':
-                        # Se for encaminhamento, notificar o destino
-                        if instance.tipo_movimentacao == 'encaminhamento':
-                            if instance.seccao_destino_id:
-                                group_name = f"seccao_{instance.seccao_destino_id}"
-                            else:
-                                group_name = f"departamento_{instance.departamento_destino_id}"
-                            send_pendencia_update_sync(group_name, f"Novo documento recebido: {instance.documento.numero_protocolo}")
-                except Exception as ws_err:
-                    logger.warning(f"Erro ao disparar WebSocket durante sync push: {ws_err}")
-
-        logger.info(f'Sync push de {instance_id}: {len(synced_uuids)} registos de {model_path}')
+        logger.info(f'Sync push de {instance_id}: {len(synced_uuids)} sincronizados, {len(skipped_uuids)} ignorados de {model_path}')
 
         return JsonResponse({
             'status': 'ok',
             'synced_uuids': synced_uuids,
+            'skipped_uuids': skipped_uuids,
             'count': len(synced_uuids),
+            'skipped': len(skipped_uuids),
         })
 
     except Exception as e:
@@ -213,14 +233,6 @@ def sync_push(request):
         error_msg = str(e)
         logger.error(f'Erro no sync push: {error_msg}')
         logger.error(traceback.format_exc())
-        
-        # Se for erro de dependência (Natural Key), reportar explicitamente
-        if 'matching query does not exist' in error_msg:
-             return JsonResponse({
-                 'error': f'Falha de integridade referencial: {error_msg}. Certifique-se de que as dependências (Admin/Dept) foram sincronizadas primeiro.',
-                 'details': error_msg
-             }, status=400) # Usar 400 em vez de 500 para erros de dados
-             
         return JsonResponse({'error': error_msg}, status=500)
 
 
