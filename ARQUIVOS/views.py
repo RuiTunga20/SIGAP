@@ -80,67 +80,90 @@ def dashboard(request):
         filtro_origem = {'departamento_origem': departamento_usuario}
 
     # --- EXECUÇÃO DAS QUERIES ---
+    is_tecnico = getattr(user, 'eh_tecnico', False)
 
     # 1. Pendentes (Encaminhados para MIM que ainda não confirmei)
-    documentos_pendentes = MovimentacaoDocumento.objects.filter(
-        tipo_movimentacao='encaminhamento',
-        confirmado_recebimento=False,
-        data_movimentacao__date=hoje,
-        **filtro_destino  # Desempacota: seccao_destino=X ou departamento_destino=Y
-    ).count()
-
-    # 2. Encaminhados HOJE (Enviados POR MIM)
-    documentos_encaminhados_hoje = MovimentacaoDocumento.objects.filter(
-        tipo_movimentacao='encaminhamento',
-        data_movimentacao__date=hoje,
-        **filtro_origem
-    ).count()
-
-    # 3. Registados (Criados) HOJE (Criados POR MIM/MINHA ÁREA)
-    # Nota: No model Documento, verifique se tem 'seccao_origem'.
-    # Se não tiver, filtramos pelo criador ou ajustamos a query.
-    # Assumindo que criamos a logica de salvar a secção na criação:
-    if seccao_usuario:
-        # Se o modelo Documento não tem 'seccao_origem', filtramos pelos docs onde a 1ª movimentação foi da secção
-        # Mas para simplificar, vamos filtrar pelo departamento E usuario se for secção, ou ajustar o model.
-        # Opção robusta:
-        documentos_registados_hoje = Documento.objects.filter(
-            departamento_origem=departamento_usuario,
-            data_criacao__date=hoje
-        )
-        if hasattr(Documento, 'seccao_origem'):  # Se existir no model
-            documentos_registados_hoje = documentos_registados_hoje.filter(seccao_origem=seccao_usuario)
-        documentos_registados_hoje = documentos_registados_hoje.count()
+    if is_tecnico:
+        documentos_pendentes = MovimentacaoDocumento.objects.filter(
+            tipo_movimentacao='encaminhamento',
+            confirmado_recebimento=False,
+            # Para técnico, contamos apenas o que foi direcionado a ele como responsável ou via redistribuição
+            documento__responsavel_atual=user,
+            **filtro_destino
+        ).count()
     else:
-        documentos_registados_hoje = Documento.objects.filter(
-            departamento_origem=departamento_usuario,
-            data_criacao__date=hoje
+        documentos_pendentes = MovimentacaoDocumento.objects.filter(
+            tipo_movimentacao='encaminhamento',
+            confirmado_recebimento=False,
+            data_movimentacao__date=hoje,
+            **filtro_destino
         ).count()
 
-    # 4. Total de documentos ATUALMENTE na minha posse (Secção ou Depto)
-    total_documentos_na_posse = Documento.objects.filter(
-        **filtro_atual
-    ).count()
+    # 2. Encaminhados HOJE (Enviados POR MIM)
+    q_encaminhados_hoje = Q(tipo_movimentacao='encaminhamento', data_movimentacao__date=hoje)
+    if is_tecnico:
+        documentos_encaminhados_hoje = MovimentacaoDocumento.objects.filter(
+            q_encaminhados_hoje,
+            usuario=user
+        ).count()
+    else:
+        documentos_encaminhados_hoje = MovimentacaoDocumento.objects.filter(
+            q_encaminhados_hoje,
+            **filtro_origem
+        ).count()
 
+    # 3. Registados (Criados) HOJE (Criados POR MIM/MINHA ÁREA)
+    if is_tecnico:
+        documentos_registados_hoje = Documento.objects.filter(
+            criado_por=user,
+            data_criacao__date=hoje
+        ).count()
+    else:
+        if seccao_usuario:
+            documentos_registados_hoje = Documento.objects.filter(
+                departamento_origem=departamento_usuario,
+                data_criacao__date=hoje
+            )
+            if hasattr(Documento, 'seccao_origem'):
+                documentos_registados_hoje = documentos_registados_hoje.filter(seccao_origem=seccao_usuario)
+            documentos_registados_hoje = documentos_registados_hoje.count()
+        else:
+            documentos_registados_hoje = Documento.objects.filter(
+                departamento_origem=departamento_usuario,
+                data_criacao__date=hoje
+            ).count()
+
+    # 4. Total de documentos ATUALMENTE na minha posse (Secção ou Depto)
     # 4b. Novos contadores refinados: POSSE vs HISTÓRICO
     doc_posse = 0
     doc_historico = 0
     
-    if seccao_usuario:
-        # Tudo que está na secção agora
-        doc_posse = Documento.objects.filter(seccao_atual=seccao_usuario).count()
-        # Tudo que já passou mas está noutro lado
+    if is_tecnico:
+        doc_posse = Documento.objects.filter(responsavel_atual=user).exclude(
+            status__in=['despacho', 'aprovado', 'reprovado', 'arquivado']
+        ).count()
         doc_todos_meus = Documento.objects.para_usuario(user).count()
         doc_historico = doc_todos_meus - doc_posse
     else:
-        # Tudo que está no depto sem secção agora
-        doc_posse = Documento.objects.filter(
-            departamento_atual=departamento_usuario, 
-            seccao_atual__isnull=True
-        ).count()
-        # Tudo que já passou mas está noutro lado
-        doc_todos_meus = Documento.objects.para_usuario(user).count()
-        doc_historico = doc_todos_meus - doc_posse
+        if seccao_usuario:
+            # Tudo que está na secção agora, exceto despachados (posse real)
+            doc_posse = Documento.objects.filter(seccao_atual=seccao_usuario).exclude(
+                 status__in=['despacho', 'aprovado', 'reprovado', 'arquivado']
+            ).count()
+            # Tudo que já passou mas está noutro lado
+            doc_todos_meus = Documento.objects.para_usuario(user).count()
+            doc_historico = doc_todos_meus - doc_posse
+        else:
+            # Tudo que está no depto sem secção agora
+            doc_posse = Documento.objects.filter(
+                departamento_atual=departamento_usuario, 
+                seccao_atual__isnull=True
+            ).exclude(
+                 status__in=['despacho', 'aprovado', 'reprovado', 'arquivado']
+            ).count()
+            # Tudo que já passou mas está noutro lado
+            doc_todos_meus = Documento.objects.para_usuario(user).count()
+            doc_historico = doc_todos_meus - doc_posse
 
     # 4c. Documentos finalizados (Arquivo Morto)
     documentos_mortos = Documento.objects.para_usuario(user).filter(
@@ -278,13 +301,14 @@ def listar_documentos(request):
     
     # Lógica do filtro de localização atual
     if local == 'posse':
+        status_excluir = [StatusDocumento.DESPACHO, StatusDocumento.APROVADO, StatusDocumento.REPROVADO, StatusDocumento.ARQUIVADO]
         if getattr(user, 'seccao', None):
-            documentos = documentos.filter(seccao_atual=user.seccao)
+            documentos = documentos.filter(seccao_atual=user.seccao).exclude(status__in=status_excluir)
         else:
             documentos = documentos.filter(
                 departamento_atual=user.departamento_id,
                 seccao_atual__isnull=True
-            )
+            ).exclude(status__in=status_excluir)
     elif local == 'historico':
         if getattr(user, 'seccao', None):
             documentos = documentos.exclude(seccao_atual=user.seccao)
@@ -416,12 +440,8 @@ def detalhe_documento(request, documento_id):
     # Lista de status que bloqueiam qualquer movimentação
     status_bloqueados = [StatusDocumento.ARQUIVADO, StatusDocumento.REPROVADO, 'concluido', StatusDocumento.APROVADO]
 
+    is_chefia = request.user.nivel_sigilo >= 1
     if documento.status not in status_bloqueados:
-        # RESTRIÇÃO: Técnicos AGORA PODEM encaminhar (apenas para Chefia, controlado via Form e HierarchyManager)
-        # if request.user.nivel_acesso in CustomUser.NIVEIS_TECNICO:
-        #     pode_encaminhar = False
-        
-        is_chefia = request.user.nivel_sigilo >= 1
         
         # Caso 1: Usuário está em uma SECÇÃO
         if user_seccao:
@@ -433,10 +453,11 @@ def detalhe_documento(request, documento_id):
             # RESTRIÇÃO DE AÇÃO:
             if documento.responsavel_atual != request.user:
                 if is_chefia:
-                    # Chefia: bloqueia o Encaminhamento (Tramitação) se estiver distribuído a um técnico
+                    # Chefia: bloqueia o Encaminhamento (Tramitação) e Despacho se estiver distribuído a um técnico
                     if documento.responsavel_atual:
                         resp = documento.responsavel_atual
-                        if getattr(resp, 'nivel_sigilo', 0) < 1 and resp != documento.criado_por:
+                        # Se o responsável é um técnico (nivel_sigilo < 1) e não o próprio chefe
+                        if getattr(resp, 'nivel_sigilo', 0) < 1 and resp != request.user:
                             pode_encaminhar = False
                 else:
                     # TÉCNICO: Não pode agir se não for o responsável atual 
@@ -467,25 +488,39 @@ def detalhe_documento(request, documento_id):
     is_tecnico = request.user.nivel_sigilo < 1
     
     # Buscar todas as movimentações para o histórico (Pareceres e Observações)
-    # Lógica de Visibilidade:
-    # 1. Técnicos vêm apenas movimentações de/para departamentos (públicas)
-    # 2. Chefes de Secção veem tudo do seu departamento (incluindo notas de técnicos)
-    # 3. Diretores veem despachos de chefes e movimentos entre depto (filtramos ruído interno)
-    
     observacoes_qs = MovimentacaoDocumento.objects.filter(documento=documento)
     
     if is_tecnico:
-        observacoes_qs = observacoes_qs.filter(seccao_destino__isnull=True, seccao_origem__isnull=True)
-    elif request.user.nivel_sigilo == 2: # Diretor de Departamento
-        # Diretores veem o fluxo estratégico.
-        # Ocultamos movimentações internas de técnicos (nível 0) para focar nos pareceres dos chefes.
-        observacoes_qs = observacoes_qs.exclude(
-            usuario__nivel_sigilo=0
-        ).filter(
-            Q(observacoes__isnull=False) | 
-            Q(tipo_movimentacao__in=['despacho', 'aprovado', 'reprovado']) |
-            Q(seccao_destino__isnull=True)
+        # REGRA REFINADA: Técnico sempre vê seus pareceres e pareceres de chefia (instruções)
+        # Mas nunca vê pareceres técnicos de outros técnicos.
+        observacoes_qs = observacoes_qs.filter(
+            Q(usuario=request.user) | 
+            Q(usuario__nivel_sigilo__gte=1)
+        ).exclude(
+            Q(usuario__nivel_sigilo=0) & ~Q(usuario=request.user)
         )
+    else:
+        # REGRA REFINADA: Diretores/Chefes veem pareceres de outros chefes E de seus técnicos diretos.
+        # "ambos vejam o parecer um do outro" (Chefe <-> Técnico do mesmo setor)
+        if user_seccao:
+            # Chefe de Secção vê: Chefia + Técnicos da sua própria Secção
+            observacoes_qs = observacoes_qs.filter(
+                Q(usuario__nivel_sigilo__gte=1) |
+                Q(usuario__seccao=user_seccao)
+            )
+        else:
+            # Diretor vê: Chefia + Técnicos diretos do Departamento (sem secção)
+            # Nota: Técnicos de secções específicas ficam "ocultos" para o Diretor (isolamento de secção)
+            # a menos que o parecer tenha sido encaminhado especificamente para o departamento.
+            observacoes_qs = observacoes_qs.filter(
+                Q(usuario__nivel_sigilo__gte=1) |
+                Q(usuario__departamento=user_departamento, usuario__seccao__isnull=True)
+            )
+    
+    # Adicional para Chefia: Se o documento está com um técnico, oculta campos de despacho/decisão final
+    if is_chefia and documento.responsavel_atual and documento.responsavel_atual != request.user:
+        if getattr(documento.responsavel_atual, 'nivel_sigilo', 0) < 1:
+            e_administrador = False # Isso oculta o card de despacho no template
         
     observacoes = observacoes_qs.order_by('-data_movimentacao')
 
@@ -803,8 +838,19 @@ def detalhe_documento(request, documento_id):
                 
                 if novo_status:
                     documento.status = novo_status
-                
-                # --- GERAÇÃO DE PDF E ENVIO DE EMAIL ---
+
+                # === NOTIFICAR O USUÁRIO ANTERIOR SOBRE O DESPACHO ===
+                ultimo_mov_anterior = MovimentacaoDocumento.objects.filter(
+                    documento=documento
+                ).exclude(tipo_movimentacao='despacho').order_by('-data_movimentacao').first()
+
+                if ultimo_mov_anterior and ultimo_mov_anterior.usuario != request.user:
+                    link_documento = request.build_absolute_uri(reverse('detalhe_documento', args=[documento.id]))
+                    Notificacao.objects.create(
+                        usuario=ultimo_mov_anterior.usuario,
+                        mensagem=f"O documento '{documento.numero_protocolo}' recebeu um despacho de {request.user.username}.",
+                        link=link_documento
+                    )
                 try:
                     # 1. Gerar PDF
                     pdf_content = gerar_pdf_despacho(documento, texto_despacho, request.user, novo_status, request=request)
@@ -2145,6 +2191,84 @@ def visualizar_arquivo(request, documento_id, tipo):
     return response
 
 
+@login_required
+@requer_mesma_administracao
+def editar_despacho(request, movimentacao_id):
+    """
+    Permite ao autor original de um despacho corrigi-lo.
+    Regenera o PDF oficial e atualiza o documento.
+    """
+    from ARQUIVOS.utils import gerar_pdf_despacho, enviar_whatsapp_notificacao
+    
+    movimentacao = get_object_or_404(MovimentacaoDocumento, id=movimentacao_id, tipo_movimentacao='despacho')
+    
+    # Segurança: Apenas o autor original pode editar
+    if movimentacao.usuario != request.user and not request.user.is_superuser:
+        messages.error(request, 'Não tem permissão para editar este despacho.')
+        return redirect('detalhe_documento', documento_id=movimentacao.documento.id)
+    
+    documento = movimentacao.documento
+    
+    if request.method == 'POST':
+        form = DespachoForm(request.POST, prefix='desp')
+        if form.is_valid():
+            with transaction.atomic():
+                # 1. Atualizar a movimentação
+                movimentacao.despacho = form.cleaned_data['despacho']
+                movimentacao.save()
+                
+                # 2. Atualizar status do documento se mudou
+                # Nota: Na edição, preservamos o status anterior se não for alterado explicitamente
+                novo_status = form.cleaned_data.get('novo_status')
+                if novo_status:
+                    documento.status = novo_status
+                
+                # 3. Regenerar PDF
+                try:
+                    pdf_content = gerar_pdf_despacho(documento, movimentacao.despacho, request.user, novo_status, request=request)
+                    documento.arquivo_digitalizado.save(pdf_content.name, pdf_content, save=False)
+                    documento.save()
+                    
+                    messages.success(request, 'Despacho corrigido e PDF regenerado com sucesso.')
+                    
+                    # 4. Enviar notificação de correção (opcional/simplificado)
+                    if documento.email:
+                         email_context = {
+                            'utente': documento.utente or "Utente",
+                            'protocolo': documento.numero_protocolo,
+                            'titulo': documento.titulo,
+                            'status': documento.get_status_display(),
+                            'administracao': request.user.administracao.nome if request.user.administracao else 'Administração SIGAP',
+                            'ano': timezone.now().year,
+                            'correcao': True
+                        }
+                         assunto = f"CORREÇÃO: Notificação de Despacho - Protocolo {documento.numero_protocolo}"
+                         mensagem_html = render_to_string('emails/despacho_email.html', email_context)
+                         email = EmailMessage(assunto, mensagem_html, None, [documento.email])
+                         email.content_subtype = "html"
+                         pdf_content.seek(0)
+                         email.attach(pdf_content.name, pdf_content.read(), 'application/pdf')
+                         email.send(fail_silently=True)
+                
+                except Exception as e:
+                    messages.warning(request, f'Despacho salvo, mas erro ao gerar PDF: {e}')
+                
+                return redirect('detalhe_documento', documento_id=documento.id)
+    else:
+        # Pre-povoar form
+        initial_data = {
+            'despacho': movimentacao.despacho,
+            'novo_status': documento.status if documento.status in [StatusDocumento.APROVADO, StatusDocumento.REPROVADO, StatusDocumento.ARQUIVADO] else ''
+        }
+        form = DespachoForm(initial=initial_data, prefix='desp')
+    
+    return render(request, 'Paginaseditar_despacho.html', {
+        'form': form,
+        'documento': documento,
+        'movimentacao': movimentacao
+    })
+
+
 def verificar_despacho(request, token):
     """
     Vista pública para verificação de autenticidade de despachos via QR Code.
@@ -2188,3 +2312,98 @@ def download_despacho_publico(request, token):
     response = FileResponse(documento.arquivo_digitalizado.open('rb'), content_type=content_type)
     response['Content-Disposition'] = f'inline; filename="{nome_arquivo}"'
     return response
+
+@login_required
+@transaction.atomic
+def preparar_despacho(request, documento_id, action):
+    """
+    Novo fluxo: Prepara a finalização (Aprovar/Reprovar) permitindo editar o texto
+    do último parecer técnico antes de torná-lo o despacho oficial.
+    """
+    from ARQUIVOS.utils import gerar_pdf_despacho
+    documento = get_object_or_404(Documento, id=documento_id)
+    
+    # Verificação de permissão (apenas Diretores/Chefes/Admins)
+    is_chefia = request.user.nivel_sigilo >= 1 or request.user.nivel_acesso in CustomUser.NIVEIS_GESTAO
+    if not is_chefia:
+        messages.error(request, "Apenas chefias ou administradores podem realizar despachos finais.")
+        return redirect('detalhe_documento', documento_id=documento.id)
+
+    # Identificar se é para Aprovar ou Reprovar (ou outro status de finalização)
+    status_alvo = action
+    if action == 'aprovado':
+        status_alvo = StatusDocumento.APROVADO
+    elif action == 'reprovado':
+        status_alvo = StatusDocumento.REPROVADO
+
+    texto_inicial = f"Documento {status_alvo}."
+    
+    # Buscar o último parecer técnico anterior para preencher
+    ultimo_parecer = MovimentacaoDocumento.objects.filter(
+        documento=documento
+    ).exclude(
+        tipo_movimentacao__in=[StatusDocumento.APROVADO, StatusDocumento.REPROVADO, StatusDocumento.ARQUIVADO]
+    ).filter(
+        Q(observacoes__isnull=False) | Q(despacho__isnull=False)
+    ).exclude(
+        Q(observacoes__exact='') & Q(despacho__exact='')
+    ).order_by('-data_movimentacao').first()
+
+    if ultimo_parecer:
+        texto_inicial = ultimo_parecer.despacho or ultimo_parecer.observacoes
+
+    if request.method == 'POST':
+        form = DespachoForm(request.POST, prefix='desp')
+        # Ajustamos o prefixo para 'desp' para ser compatível com o template Paginaseditar_despacho
+        if form.is_valid():
+            final_texto = form.cleaned_data['despacho']
+            final_status = form.cleaned_data.get('novo_status') or status_alvo
+            
+            # 1. Criar a movimentação final (O usuário agora é o AUTOR)
+            MovimentacaoDocumento.objects.create(
+                documento=documento,
+                tipo_movimentacao=final_status,
+                seccao_origem=request.user.seccao,
+                departamento_origem=request.user.departamento,
+                usuario=request.user,
+                despacho=final_texto,
+                observacoes=f"Finalizado como {final_status} por {request.user.username}."
+            )
+            
+            # 2. Atualizar documento
+            documento.status = final_status
+            documento.data_conclusao = timezone.now()
+            
+            # 3. Gerar PDF e salvar
+            try:
+                pdf_content = gerar_pdf_despacho(documento, final_texto, request.user, final_status, request=request)
+                documento.arquivo_digitalizado.save(pdf_content.name, pdf_content, save=False)
+                documento.save()
+            except Exception as e:
+                messages.warning(request, f"Documento finalizado, mas houve erro ao gerar o PDF: {e}")
+            
+            # 4. Notificar Usuário Anterior
+            ultimo_mov_anterior = MovimentacaoDocumento.objects.filter(
+                documento=documento
+            ).exclude(tipo_movimentacao=final_status).order_by('-data_movimentacao').first()
+
+            if ultimo_mov_anterior and ultimo_mov_anterior.usuario != request.user:
+                link_documento = request.build_absolute_uri(reverse('detalhe_documento', args=[documento.id]))
+                Notificacao.objects.create(
+                    usuario=ultimo_mov_anterior.usuario,
+                    mensagem=f"O documento '{documento.numero_protocolo}' foi finalizado como {final_status} por {request.user.username}.",
+                    link=link_documento
+                )
+
+            messages.success(request, f"Documento finalizado com sucesso como {final_status}.")
+            return redirect('detalhe_documento', documento_id=documento.id)
+    else:
+        # GET - Preenche o formulário
+        form = DespachoForm(initial={'despacho': texto_inicial, 'novo_status': status_alvo}, prefix='desp')
+
+    context = {
+        'documento': documento,
+        'form': form,
+        'action_label': status_alvo.upper()
+    }
+    return render(request, 'Paginaseditar_despacho.html', context)

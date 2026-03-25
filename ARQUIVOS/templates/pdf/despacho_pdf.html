@@ -238,8 +238,8 @@
                     {% if admin.endereco %}
                         {{ admin.endereco|linebreaksbr }}
                     {% else %}
-                        Rua do Comércio, Edifício Sede<br>
-                        Centro da Cidade, Província do Uíge<br>
+                        Sede Administrativa<br>
+                        Província do {{ admin.provincia|default:"Angola" }}<br>
                         República de Angola
                     {% endif %}
                 </td>
@@ -255,7 +255,7 @@
                     {% if admin.contacto %}
                         {{ admin.contacto|linebreaksbr }}
                     {% else %}
-                        Email: geral@uige.gov.ao<br>
+                        Email: {{ admin_email }}<br>
                         Portal: www.mat.gov.ao<br>
                         Tel: (+244) 900 000 000
                     {% endif %}

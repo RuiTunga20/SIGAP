@@ -80,7 +80,8 @@ def sync_push(request):
         file_fields = [f.name for f in model._meta.get_fields() if isinstance(f, (FileField, ImageField))]
 
         with transaction.atomic():
-            for obj in deserialize('json', data):
+            # Deserializar usando Natural Keys para resolver FKs via UUID
+            for obj in deserialize('json', data, use_natural_foreign_keys=True):
                 instance = obj.object
                 uuid_sinc = instance.uuid_sinc
 
@@ -218,8 +219,8 @@ def sync_pull(request):
         queryset = queryset[:batch_size]
         count = queryset.count()
 
-        # Serialização normal dos dados
-        data = serialize('json', queryset, use_natural_primary_keys=False)
+        # Serialização usando Natural Keys para enviar UUIDs em vez de PKs numéricas
+        data = serialize('json', queryset, use_natural_foreign_keys=True, use_natural_primary_keys=True)
         
         # Serialização adiciocal de arquivos em Base64
         files_dict = {}

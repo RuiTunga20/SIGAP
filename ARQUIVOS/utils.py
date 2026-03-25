@@ -141,13 +141,32 @@ def gerar_pdf_despacho(documento, texto_despacho, usuario_responsavel, novo_stat
     # Gerar QR Code de verificação
     qr_base64 = None
     url_verificacao = ''
-    if request:
-        from django.urls import reverse
-        url_verificacao = request.build_absolute_uri(
-            reverse('verificar_despacho', args=[str(documento.token_verificacao)])
-        )
+    
+    # Prioridade para o servidor central (online) se configurado, para que a verificação funcione via internet
+    central_url = getattr(settings, 'SYNC_CENTRAL_URL', '').rstrip('/')
+    from django.urls import reverse
+    path_verificacao = reverse('verificar_despacho', args=[str(documento.token_verificacao)])
+    
+    if central_url:
+        url_verificacao = f"{central_url}{path_verificacao}"
+    elif request:
+        url_verificacao = request.build_absolute_uri(path_verificacao)
     else:
         url_verificacao = f'/verificar-despacho/{documento.token_verificacao}/'
+    
+    # Gerar email dinâmico para o rodapé (ex: uige@sigap.gov.ao)
+    import re
+    def slugify_simple(text):
+        if not text: return "geral"
+        text = text.lower()
+        # Remove "administração municipal" ou similares para ficar só o nome principal
+        text = text.replace('administração municipal de', '').replace('administração municipal do', '').replace('governo provincial de', '').strip()
+        text = text.split('(')[0].strip() # Remove parênteses
+        text = re.sub(r'[^a-z0-9]', '', text)
+        return text or "geral"
+
+    nome_slug = slugify_simple(admin.nome)
+    admin_email = f"{nome_slug}@sigap.gov.ao"
     
     # Gerar imagem QR Code
     qr = qrcode.QRCode(version=1, box_size=10, border=2)
@@ -173,6 +192,7 @@ def gerar_pdf_despacho(documento, texto_despacho, usuario_responsavel, novo_stat
         'data_texto': data_texto,
         'qr_base64': qr_base64,
         'url_verificacao': url_verificacao,
+        'admin_email': admin_email,
     }
     
     # Renderizar HTML

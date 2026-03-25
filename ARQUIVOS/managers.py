@@ -1,5 +1,6 @@
 from django.db import models
 from django.db.models import Q
+from django.core.exceptions import ValidationError
 from ARQUIVOS.models.mixins import SoftDeleteManager
 
 
@@ -37,11 +38,23 @@ class DocumentoManager(SoftDeleteManager):
         
         # Se for Técnico (Nível 0), aplica filtro restritivo "NEED-TO-KNOW"
         if getattr(user, 'eh_tecnico', False):
-             return qs.filter(
-                Q(criado_por=user) |            # Meus documentos (criados)
-                Q(responsavel_atual=user) |     # Atribuídos a mim (distribuídos)
-                Q(movimentacoes__usuario=user)  # Que eu já movimentei (histórico)
-             ).distinct()
+             # 1. Meus documentos (criados ou atribuídos ou histórico)
+             # 2. PLUS: Qualquer documento finalizado (Arquivo Morto) do meu departamento/secção
+             
+             status_mortos = [
+                 'despacho', 'aprovado', 'reprovado', 'arquivado'
+             ]
+             
+             q_base = Q(criado_por=user) | Q(responsavel_atual=user) | Q(movimentacoes__usuario=user)
+             
+             if user.seccao:
+                 q_arquivo_morto = Q(seccao_atual=user.seccao, status__in=status_mortos)
+             elif user.departamento:
+                 q_arquivo_morto = Q(departamento_atual=user.departamento, seccao_atual__isnull=True, status__in=status_mortos)
+             else:
+                 q_arquivo_morto = Q(pk__in=[])
+                 
+             return qs.filter(q_base | q_arquivo_morto).distinct()
 
         # Se for Chefia/Direção (Nivel >= 1), vê tudo do seu setor + Histórico
         # (Mantém lógica original de setor, mas agora restrita a chefes)
@@ -80,12 +93,15 @@ class DocumentoManager(SoftDeleteManager):
 
 
 class AdministracaoManager(models.Manager):
-    """Manager para Administracao"""
-    pass
+    """Manager para Administracao com suporte a Natural Keys"""
+    def get_by_natural_key(self, uuid_sinc):
+        return self.get(uuid_sinc=uuid_sinc)
 
 
 class DepartamentoManager(models.Manager):
-    """Manager para Departamento com lógica de isolamento"""
+    """Manager para Departamento com lógica de isolamento e Natural Keys"""
+    def get_by_natural_key(self, uuid_sinc):
+        return self.get(uuid_sinc=uuid_sinc)
 
     def para_administracao(self, administracao):
         """
@@ -102,10 +118,23 @@ class DepartamentoManager(models.Manager):
         ).distinct()
 
 
+class SeccaoManager(models.Manager):
+    """Manager para Secção com suporte a Natural Keys"""
+    def get_by_natural_key(self, uuid_sinc):
+        return self.get(uuid_sinc=uuid_sinc)
+
+
 from django.contrib.auth.models import UserManager as BaseUserManager
 
 class UsuarioManager(BaseUserManager):
-    """Manager para CustomUser com lógica de isolamento"""
+    """Manager para CustomUser com lógica de isolamento e Natural Keys"""
+    def get_by_natural_key(self, identifier):
+        try:
+            # Tenta tratar o identificador como UUID (para sincronização entre instâncias)
+            return self.get(uuid_sinc=identifier)
+        except (self.model.DoesNotExist, ValidationError, ValueError, TypeError):
+            # Fallback para username (para autenticação padrão do Django / ModelBackend)
+            return self.get(username=identifier)
 
     def da_mesma_administracao(self, usuario):
         """

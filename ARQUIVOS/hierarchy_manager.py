@@ -48,20 +48,19 @@ PAPEL_SECRETARIO = 'SECRETARIO'
 PAPEL_DESCONHECIDO = 'DESCONHECIDO'
 
 
-def _obter_papel_gabinete(seccao) -> str:
+def _obter_papel_gabinete(seccao, user_nivel_acesso=None) -> str:
     """
-    Identifica o papel/cargo do utilizador dentro de um Gabinete
-    com base no nome da Secção (cargo).
-    
-    Returns:
-        str: Uma das constantes PAPEL_*
+    Identifica o papel/cargo do utilizador dentro de um Gabinete.
     """
+    if user_nivel_acesso == 'secretario_admin':
+        return PAPEL_SECRETARIO
+
     if not seccao:
         return PAPEL_DESCONHECIDO
     
     nome = seccao.nome.lower()
     
-    # Director Adjunto de Gabinete (verificar ANTES de Director de Gabinete)
+    # Director Adjunto de Gabinete
     if 'director adjunto' in nome and 'gabinete' in nome:
         return PAPEL_DIRECTOR_ADJUNTO
     
@@ -78,7 +77,7 @@ def _obter_papel_gabinete(seccao) -> str:
     if 'secretário' in nome or 'secretária' in nome or 'secretario' in nome:
         return PAPEL_SECRETARIO
     
-    # Titular (Ministro, Governador, Vice-Governador, Administrador, Adjunto)
+    # Titular
     titulares_keywords = [
         'ministro', 'governador', 'vice-governador',
         'administrador municipal', 'secretário de estado',
@@ -90,18 +89,26 @@ def _obter_papel_gabinete(seccao) -> str:
     return PAPEL_DESCONHECIDO
 
 
-def _filtrar_seccoes_gabinete(dept, seccao, papel):
+def _filtrar_seccoes_gabinete(dept, seccao, papel, tipo_municipio='A'):
     """
     Aplica as restrições de tramitação dentro de um Gabinete.
     
-    Regras:
-    - SECRETÁRIO: Pode enviar para Director de Gabinete e Assessor APENAS
-    - ASSESSOR: Pode enviar para Secretário e Director de Gabinete APENAS
-    - DIRECTOR DE GABINETE / DIRECTOR ADJUNTO: Pode enviar para TODOS (incluindo Titular)
-    - TITULAR: Pode despachar para TODOS
+    Tipo E: Secretário(a) PODE enviar para o Titular.
     """
     todas_seccoes = Seccoes.objects.filter(departamento=dept).exclude(pk=seccao.pk)
     
+    # Regra para Tipo E (Administração Simplificada)
+    if tipo_municipio == 'E':
+        # "elemina ACESSORES E DIRECTORES DE GABINETE"
+        # Mantém apenas Secretariado e o Titular
+        todas_seccoes = todas_seccoes.exclude(
+            Q(nome__icontains='Assessor') | Q(nome__icontains='Director')
+        )
+        if papel == PAPEL_SECRETARIO:
+            # Secretário em Tipo E PODE enviar para o Titular
+            return todas_seccoes
+    
+    # Regras Gerais (Outros tipos)
     if papel == PAPEL_SECRETARIO:
         # Secretário(a) NUNCA envia ao Titular — só Dir. Gabinete e Assessor
         return todas_seccoes.filter(
@@ -422,16 +429,25 @@ def _calcular_destinos_permitidos(user, ctx=None, incluir_self=True):
             # Directores/Alta Gestão: veem todos os departamentos
             qs_dept_final = qs_dept_base.order_by('nome')
         elif getattr(user, 'nivel_sigilo', 0) == 1:
-            # Chefes de Secção: veem APENAS o departamento pai (+ secções irmãs via qs_sec)
-            qs_dept_final = Departamento.objects.filter(pk=dept.pk).order_by('nome') if dept else Departamento.objects.none()
+            # Chefes de Secção: veem APENAS o departamento pai
+            # EXCEÇÃO: Secretário do Administrador em Tipo E vê TODOS os departamentos
+            is_secretario_tipo_e = (
+                getattr(user, 'nivel_acesso', None) == 'secretario_admin' and 
+                admin and admin.tipo_municipio == 'E'
+            )
+            if is_secretario_tipo_e:
+                qs_dept_final = qs_dept_base.order_by('nome')
+            else:
+                qs_dept_final = Departamento.objects.filter(pk=dept.pk).order_by('nome') if dept else Departamento.objects.none()
         else:
             qs_dept_final = Departamento.objects.filter(pk=dept.pk) if dept else Departamento.objects.none()
         
         # === RESTRIÇÃO DE GABINETE ===
         # Se o utilizador está numa secção de Gabinete, aplica política de tramitação
         if _is_gabinete(dept):
-            papel = _obter_papel_gabinete(seccao)
-            qs_sec_final = _filtrar_seccoes_gabinete(dept, seccao, papel).order_by('nome')
+            papel = _obter_papel_gabinete(seccao, getattr(user, 'nivel_acesso', None))
+            tipo_municipio = admin.tipo_municipio if admin else 'A'
+            qs_sec_final = _filtrar_seccoes_gabinete(dept, seccao, papel, tipo_municipio).order_by('nome')
         else:
             # Comportamento normal (fora de gabinete)
             qs_sec_final = Seccoes.objects.filter(

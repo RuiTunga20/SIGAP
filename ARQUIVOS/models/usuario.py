@@ -17,11 +17,16 @@ class Administracao(SyncMixin):
     nome = models.CharField(max_length=255)
     tipo_municipio = models.CharField(max_length=1, choices=TIPO_MUNICIPIO_CHOICES, default='A')
     provincia = models.CharField(max_length=255, blank=True, null=True)
+    endereco = models.TextField(blank=True, null=True)
+    contacto = models.TextField(blank=True, null=True, help_text="Email, Site e Telefone")
 
     def __str__(self):
         return self.nome   
     
     objects = AdministracaoManager()
+
+    def natural_key(self):
+        return (str(self.uuid_sinc),)
     
     class GovernoManager(models.Manager):
         def get_queryset(self):
@@ -63,6 +68,9 @@ class Ministerio(Administracao):
 class CustomUser(AbstractUser, SyncMixin):
     objects = UsuarioManager()
 
+    def natural_key(self):
+        return (str(self.uuid_sinc),)
+
     NIVEL_CHOICES = [
         # --- Gestão (todos os tipos) ---
         ('admin_sistema', 'Administrador de Sistema'),
@@ -91,6 +99,7 @@ class CustomUser(AbstractUser, SyncMixin):
         # --- Direcção Administração Municipal ---
         ('diretor_municipal', 'Director Municipal e Equiparado'),
         ('chefe_seccao', 'Chefe de Secção'),
+        ('secretario_admin', 'Secretário(a) do Administrador'),
 
         # --- Operacional (todos os tipos) ---
         ('tecnico', 'Técnico'),
@@ -127,7 +136,11 @@ class CustomUser(AbstractUser, SyncMixin):
             'admin_sistema', 'governador', 'vice_governador',
             'diretor_gabinete', 'chefe_departamento', 'tecnico',
         ],
-        '_default': [  # Administrações Municipais (A-E)
+        'E': [  # Administrações Municipais Tipo E (Simplificada)
+            'admin_sistema', 'admin_municipal', 
+            'chefe_seccao', 'secretario_admin', 'tecnico',
+        ],
+        '_default': [  # Administrações Municipais (A-D)
             'admin_sistema', 'admin_municipal', 'admin_adjunto',
             'diretor_municipal', 'chefe_seccao', 'tecnico',
         ],
@@ -217,7 +230,7 @@ class CustomUser(AbstractUser, SyncMixin):
                                  'diretor_nacional', 'diretor_gabinete', 'diretor_municipal',
                                  'secretario_estado', 'vice_governador', 'admin_adjunto']:
             self.nivel_sigilo = 2 # Direção / Alta Gestão
-        elif self.nivel_acesso in ['chefe_departamento', 'chefe_seccao']:
+        elif self.nivel_acesso in ['chefe_departamento', 'chefe_seccao', 'secretario_admin']:
             self.nivel_sigilo = 1 # Chefia
         elif self.nivel_acesso == 'tecnico':
              # Mantém 0, a menos que tenha sido alterado manualmente (permite override)

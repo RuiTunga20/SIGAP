@@ -144,8 +144,8 @@ class Command(BaseCommand):
 
                 self.stdout.write(f'   📦 {model_path}: a enviar {count} registos...')
 
-                # Serializar para JSON
-                data = serialize('json', pendentes, use_natural_primary_keys=False)
+                # Serializar para JSON usando Natural Keys para resolver FKs via UUID
+                data = serialize('json', pendentes, use_natural_foreign_keys=True, use_natural_primary_keys=True)
 
                 # Extrair arquivos em Base64 para envio
                 files_dict = {}
@@ -271,91 +271,95 @@ class Command(BaseCommand):
                         self.stdout.write(f'   📦 {model_path}: a receber {count} registos...')
 
                         # Deserializar e salvar
-                        with transaction.atomic():
-                            files_data_all = result.get('files', {})
-                            file_fields = [f.name for f in model._meta.get_fields() if isinstance(f, (FileField, ImageField))]
+                        try:
+                            with transaction.atomic():
+                                files_data_all = result.get('files', {})
+                                file_fields = [f.name for f in model._meta.get_fields() if isinstance(f, (FileField, ImageField))]
 
-                            for obj in deserialize('json', data):
-                                instance = obj.object
-                                uuid_str = str(instance.uuid_sinc)
-                                files_data = files_data_all.get(uuid_str, {})
+                                # Deserializar usando Natural Keys para resolver FKs via UUID
+                                for obj in deserialize('json', data, use_natural_foreign_keys=True):
+                                    instance = obj.object
+                                    uuid_str = str(instance.uuid_sinc)
+                                    files_data = files_data_all.get(uuid_str, {})
 
-                                # Verificar se já existe por UUID
-                                existing = model.objects.filter(
-                                    uuid_sinc=instance.uuid_sinc
-                                ).first()
+                                    # Verificar se já existe por UUID
+                                    existing = model.objects.filter(
+                                        uuid_sinc=instance.uuid_sinc
+                                    ).first()
 
-                                # Fallback para CustomUser (evitar erro de username duplicado)
-                                if not existing and model_path == 'ARQUIVOS.CustomUser':
-                                    existing = model.objects.filter(username=instance.username).first()
+                                    # Fallback para CustomUser (evitar erro de username duplicado)
+                                    if not existing and model_path == 'ARQUIVOS.CustomUser':
+                                        existing = model.objects.filter(username=instance.username).first()
+                                        if existing:
+                                            # Vincular UUID local ao UUID remoto/central
+                                            model.objects.filter(pk=existing.pk).update(uuid_sinc=instance.uuid_sinc)
+                                            self.stdout.write(self.style.WARNING(f'   ⚠️ Usuário {instance.username} vinculado por username.'))
+
+                                    # 2. Resolução de Conflitos ou Inserção
                                     if existing:
-                                        # Vincular UUID local ao UUID remoto/central
-                                        model.objects.filter(pk=existing.pk).update(uuid_sinc=instance.uuid_sinc)
-                                        self.stdout.write(self.style.WARNING(f'   ⚠️ Usuário {instance.username} vinculado por username.'))
+                                        # Estratégia: o que tem a data_modificacao mais recente vence
+                                        remote_mod = getattr(instance, 'data_modificacao', None)
+                                        local_mod = getattr(existing, 'data_modificacao', None)
 
-                                # 2. Resolução de Conflitos ou Inserção
-                                if existing:
-                                    # Estratégia: o que tem a data_modificacao mais recente vence
-                                    remote_mod = getattr(instance, 'data_modificacao', None)
-                                    local_mod = getattr(existing, 'data_modificacao', None)
-
-                                    if not local_mod or (remote_mod and remote_mod > local_mod):
-                                        # Remoto é mais recente: Atualizar local
-                                        # Copiar campos manualmente para evitar erros de validação com PK
-                                        for field in model._meta.fields:
-                                            if not field.primary_key and field.name not in ['uuid_sinc']:
-                                                setattr(existing, field.name, getattr(instance, field.name))
-                                        
-                                        # Processar arquivos se houver
+                                        if not local_mod or (remote_mod and remote_mod > local_mod):
+                                            # Remoto é mais recente: Atualizar local
+                                            # Copiar campos manualmente para evitar erros de validação com PK
+                                            for field in model._meta.fields:
+                                                if not field.primary_key and field.name not in ['uuid_sinc']:
+                                                    setattr(existing, field.name, getattr(instance, field.name))
+                                            
+                                            # Processar arquivos se houver
+                                            for field_name in file_fields:
+                                                f_data = files_data.get(field_name)
+                                                if f_data:
+                                                    content = base64.b64decode(f_data['content'])
+                                                    getattr(existing, field_name).save(f_data['name'], ContentFile(content), save=False)
+                                            
+                                            # Usar pendente_sinc=False para evitar que o save() do mixin marque como pendente
+                                            existing.save(update_fields=[f.name for f in model._meta.fields if not f.primary_key] + ['pendente_sinc'])
+                                            instance = existing
+                                        else:
+                                            # Local é mais recente: Ignorar pull silenciosamente
+                                            continue
+                                    else:
+                                        # Novo registo: Inserir
                                         for field_name in file_fields:
                                             f_data = files_data.get(field_name)
                                             if f_data:
                                                 content = base64.b64decode(f_data['content'])
-                                                getattr(existing, field_name).save(f_data['name'], ContentFile(content), save=False)
+                                                getattr(instance, field_name).save(f_data['name'], ContentFile(content), save=False)
                                         
-                                        # Usar pendente_sinc=False para evitar que o save() do mixin marque como pendente
-                                        existing.save(update_fields=[f.name for f in model._meta.fields if not f.primary_key] + ['pendente_sinc'])
-                                        instance = existing
-                                    else:
-                                        # Local é mais recente: Ignorar pull silenciosamente
-                                        continue
-                                else:
-                                    # Novo registo: Inserir
-                                    for field_name in file_fields:
-                                        f_data = files_data.get(field_name)
-                                        if f_data:
-                                            content = base64.b64decode(f_data['content'])
-                                            getattr(instance, field_name).save(f_data['name'], ContentFile(content), save=False)
-                                    
-                                    instance.pendente_sinc = False
-                                    instance.save()
+                                        instance.pendente_sinc = False
+                                        instance.save()
 
-                                # Marcar como sincronizado localmente e preservar ultima_sincronizacao do servidor
-                                model.objects.filter(
-                                    uuid_sinc=instance.uuid_sinc
-                                ).update(
-                                    pendente_sinc=False,
-                                    ultima_sincronizacao=timezone.now(),
-                                )
+                                    # Marcar como sincronizado localmente e preservar ultima_sincronizacao do servidor
+                                    model.objects.filter(
+                                        uuid_sinc=instance.uuid_sinc
+                                    ).update(
+                                        pendente_sinc=False,
+                                        ultima_sincronizacao=timezone.now(),
+                                    )
 
-                                # --- Gatilhos de WebSocket Real-time ---
-                                try:
-                                    if model_path == 'ARQUIVOS.Notificacao':
-                                        group_name = f"user_{instance.usuario_id}"
-                                        send_notification_sync(group_name, instance.mensagem, instance.link)
-                                    elif model_path == 'ARQUIVOS.MovimentacaoDocumento':
-                                        if instance.tipo_movimentacao == 'encaminhamento':
-                                            if instance.seccao_destino_id:
-                                                group_name = f"seccao_{instance.seccao_destino_id}"
-                                            else:
-                                                group_name = f"departamento_{instance.departamento_destino_id}"
-                                            send_pendencia_update_sync(group_name, f"Novo documento recebido via sync: {instance.documento.numero_protocolo}")
-                                except Exception as ws_err:
-                                    self.stdout.write(self.style.WARNING(f'   ⚠️ Erro ao disparar WebSocket durante sync pull: {ws_err}'))
+                                    # --- Gatilhos de WebSocket Real-time ---
+                                    try:
+                                        if model_path == 'ARQUIVOS.Notificacao':
+                                            group_name = f"user_{instance.usuario_id}"
+                                            send_notification_sync(group_name, instance.mensagem, instance.link)
+                                        elif model_path == 'ARQUIVOS.MovimentacaoDocumento':
+                                            if instance.tipo_movimentacao == 'encaminhamento':
+                                                if instance.seccao_destino_id:
+                                                    group_name = f"seccao_{instance.seccao_destino_id}"
+                                                else:
+                                                    group_name = f"departamento_{instance.departamento_destino_id}"
+                                                send_pendencia_update_sync(group_name, f"Novo documento recebido via sync: {instance.documento.numero_protocolo}")
+                                    except Exception as ws_err:
+                                        self.stdout.write(self.style.WARNING(f'   ⚠️ Erro ao disparar WebSocket durante sync pull: {ws_err}'))
 
-                        self.stdout.write(self.style.SUCCESS(
-                            f'   ✅ {model_path}: {count} recebidos'
-                        ))
+                            self.stdout.write(self.style.SUCCESS(
+                                f'   ✅ {model_path}: {count} recebidos'
+                            ))
+                        except Exception as e:
+                            self.stdout.write(self.style.ERROR(f'   ❌ Erro ao processar {model_path}: {e}'))
                     else:
                         self.stdout.write(self.style.ERROR(
                             f'   ❌ {model_path}: erro HTTP {response.status_code}'

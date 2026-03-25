@@ -35,6 +35,10 @@ CSRF_TRUSTED_ORIGINS_DEFAULT = [
     'http://192.168.1.191:8000',
     'http://192.168.1.192',
     'http://192.168.1.192:8000',
+    'http://192.168.0.213',
+    'http://192.168.0.213:8000',
+    'http://0.0.0.0',
+    'http://0.0.0.0:8000',
     'https://gap-1.onrender.com',
     'https://sigap-1.onrender.com'
 ]

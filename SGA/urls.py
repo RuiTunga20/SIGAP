@@ -71,6 +71,8 @@ path('notificacoes/marcar-como-lidas/', views.marcar_notificacoes_como_lidas, na
     # Verificação de Despacho (Pública - Token UUID seguro)
     path('verificar-despacho/<uuid:token>/', views.verificar_despacho, name='verificar_despacho'),
     path('verificar-despacho/<uuid:token>/download/', views.download_despacho_publico, name='download_despacho_publico'),
+    path('despacho/editar/<int:movimentacao_id>/', views.editar_despacho, name='editar_despacho'),
+    path('documentos/<int:documento_id>/preparar-despacho/<str:action>/', views.preparar_despacho, name='preparar_despacho'),
 
     # API de Sincronização (Online/Offline)
     path('api/sync/push/', __import__('ARQUIVOS.sync_views', fromlist=['sync_push']).sync_push, name='sync_push'),

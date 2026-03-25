@@ -1,7 +1,7 @@
 from django.db import models
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from ARQUIVOS.managers import DepartamentoManager
+from ARQUIVOS.managers import DepartamentoManager, SeccaoManager
 from ARQUIVOS.models.mixins import SyncMixin
 
 class Departamento(SyncMixin):
@@ -38,6 +38,9 @@ class Departamento(SyncMixin):
 
     objects = DepartamentoManager()
 
+    def natural_key(self):
+        return (str(self.uuid_sinc),)
+
     def clean(self):
         """Valida a consistência do departamento"""
         super().clean()
@@ -72,6 +75,11 @@ class Seccoes(SyncMixin):
                                     related_name='seccao_responsavel')
     ativo = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
+
+    objects = SeccaoManager()
+
+    def natural_key(self):
+        return (str(self.uuid_sinc),)
 
     @property
     def administracao(self):
