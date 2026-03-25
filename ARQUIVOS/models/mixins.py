@@ -80,10 +80,13 @@ class SyncMixin(models.Model):
         # que precisa de ser sincronizada (exceto se estivermos no meio de um processo de sync)
         if 'update_fields' in kwargs:
             if 'pendente_sinc' not in kwargs['update_fields']:
-                self.pendente_sinc = True
-                kwargs['update_fields'] = list(kwargs['update_fields']) + ['pendente_sinc']
+                # Se já estava como pendente, garantimos que continua e é salvo
+                if self.pendente_sinc:
+                    kwargs['update_fields'] = list(kwargs['update_fields']) + ['pendente_sinc']
         else:
-            self.pendente_sinc = True
+            # Se não passamos update_fields, só forçamos True se já for True (default)
+            # Se alguém setou False manualmente antes do save, respeitamos.
+            pass
             
         super().save(*args, **kwargs)
 

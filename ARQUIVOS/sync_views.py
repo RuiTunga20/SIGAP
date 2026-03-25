@@ -91,6 +91,13 @@ def sync_push(request):
                 # 1. Verificar se já existe por UUID
                 existing = model.objects.filter(uuid_sinc=uuid_sinc).first()
                 
+                # Fallback para Administracao (evitar erro de UUID diferente para mesma admin)
+                if not existing and model_path == 'ARQUIVOS.Administracao':
+                    existing = model.objects.filter(nome=instance.nome).first()
+                    if existing:
+                        model.objects.filter(pk=existing.pk).update(uuid_sinc=uuid_sinc)
+                        logger.info(f'Vinculada administração {instance.nome} por nome e atualizado UUID.')
+
                 # Fallback para Departamento (evitar erro de nome duplicado na mesma admin)
                 if not existing and model_path == 'ARQUIVOS.Departamento':
                     admin = getattr(instance, 'administracao', None)
@@ -140,7 +147,13 @@ def sync_push(request):
                         
                         # Guardar o objeto existente (faz o UPDATE)
                         # Usamos pendente_sinc=False para evitar que o save() do mixin marque como pendente
-                        existing.save(update_fields=[f.name for f in model._meta.fields if not f.primary_key] + ['pendente_sinc'])
+                        try:
+                            update_fields = [f.name for f in model._meta.fields if not f.primary_key and not isinstance(f, (FileField, ImageField))] + ['pendente_sinc']
+                            existing.save(update_fields=update_fields)
+                        except Exception as save_err:
+                            logger.error(f"Erro ao atualizar {model_path} {uuid_sinc}: {save_err}")
+                            raise save_err
+                            
                         # Vincular instance ao existente para uso nos gatilhos de WS abaixo
                         instance = existing 
                     else:
@@ -155,8 +168,13 @@ def sync_push(request):
                         if field_data:
                             content = base64.b64decode(field_data['content'])
                             getattr(instance, field_name).save(field_data['name'], ContentFile(content), save=False)
+                    
                     instance.pendente_sinc = False
-                    instance.save()
+                    try:
+                        instance.save()
+                    except Exception as save_err:
+                        logger.error(f"Erro ao inserir novo {model_path} {uuid_sinc}: {save_err}")
+                        raise save_err
 
                 # Marcar como sincronizado e definir origem
                 model.objects.filter(uuid_sinc=uuid_sinc).update(
