@@ -247,11 +247,10 @@ class Command(BaseCommand):
                     # Margem de segurança para lidar com variações de relógio entre os servidores
                     since_time = last_sync - timedelta(minutes=5) if last_sync else None
 
-                    # Metadados base (Foundational) devem ser sempre puxados na totalidade no primeiro sync 
-                    # Se last_sync existe, usamos incremental para permitir paginação correta
+                    # Metadados base (Foundational) devem ser sempre puxados na totalidade 
                     if model_path in ['ARQUIVOS.Administracao', 'ARQUIVOS.TipoDocumento', 
                                       'ARQUIVOS.Departamento', 'ARQUIVOS.Seccoes',
-                                      'ARQUIVOS.ConfiguracaoSistema', 'ARQUIVOS.LocalArmazenamento'] and not last_sync:
+                                      'ARQUIVOS.ConfiguracaoSistema', 'ARQUIVOS.LocalArmazenamento']:
                         since_time = None
 
                     params = {
