@@ -252,8 +252,10 @@ def sync_pull(request):
         # Obter todos os registos relevantes
         queryset = model.objects.all()
 
-        # Evitar enviar de volta o que a própria instância acabou de carregar
-        if instance_id and hasattr(model, 'origem_instancia'):
+        # Evitar enviar de volta o que a própria instância acabou de carregar (evitar eco)
+        # MAS apenas se for um pull incremental (since definido).
+        # Se for um pull total (since vazio), permitimos recuperar registros próprios (ex: após reset da DB local)
+        if instance_id and hasattr(model, 'origem_instancia') and since:
             queryset = queryset.exclude(origem_instancia=instance_id)
 
         if since:
