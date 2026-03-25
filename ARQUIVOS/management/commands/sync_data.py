@@ -249,6 +249,7 @@ class Command(BaseCommand):
 
                     # Metadados base (Foundational) devem ser sempre puxados na totalidade 
                     if model_path in ['ARQUIVOS.Administracao', 'ARQUIVOS.TipoDocumento', 
+                                      'ARQUIVOS.Departamento', 'ARQUIVOS.Seccoes',
                                       'ARQUIVOS.ConfiguracaoSistema', 'ARQUIVOS.LocalArmazenamento']:
                         since_time = None
 
