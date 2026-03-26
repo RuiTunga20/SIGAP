@@ -53,7 +53,8 @@ class Departamento(SyncMixin):
                 })
 
     def save(self, *args, **kwargs):
-        self.full_clean()
+        if not self._skip_validation:
+            self.full_clean()
         super().save(*args, **kwargs)
 
 

@@ -12,6 +12,9 @@ class TipoDocumento(SyncMixin):
     """
     Tipos de documentos que podem ser cadastrados
     """
+    def natural_key(self):
+        return (str(self.uuid_sinc),)
+
     nome = models.CharField(max_length=50, unique=True)
     descricao = models.TextField(blank=True)
     prazo_dias = models.IntegerField(default=30, help_text="Prazo padrão em dias para processamento")
@@ -39,6 +42,9 @@ class Documento(SoftDeleteModel, AuditoriaModel, SyncMixin):
     """
     Modelo principal para documentos
     """
+    def natural_key(self):
+        return (str(self.uuid_sinc),)
+
     PRIORIDADE_CHOICES = [
         ('baixa', 'Baixa 🟢'),
         ('normal', 'Normal 🟡'),
@@ -185,6 +191,9 @@ class Anexo(SyncMixin):
     """
     Anexos adicionais aos documentos
     """
+    def natural_key(self):
+        return (str(self.uuid_sinc),)
+
     documento = models.ForeignKey(Documento, on_delete=models.CASCADE, related_name='anexos')
     arquivo = models.FileField(upload_to='anexos/%Y/%m/')
     nome = models.CharField(max_length=200)

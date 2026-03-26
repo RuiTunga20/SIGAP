@@ -30,6 +30,77 @@ from django.db import transaction
 logger = logging.getLogger('sync')
 
 
+def _resolver_fks_no_json(records, model):
+    """
+    Pré-processa uma lista de registos JSON (formato Django serializer)
+    e substitui referências Natural Key (UUIDs) por PKs reais do servidor local.
+    
+    Quando serialize(..., use_natural_foreign_keys=True) é usado, FKs são escritas como:
+      "fields": { "administracao": ["uuid-aqui"] }
+    
+    Esta função resolve cada FK manualmente usando uuid_sinc.
+    """
+    fk_fields = {}
+    for field in model._meta.get_fields():
+        if hasattr(field, 'related_model') and field.related_model and hasattr(field, 'name'):
+            related_model = field.related_model
+            if hasattr(related_model, 'uuid_sinc'):
+                fk_fields[field.name] = related_model
+
+    resolved_records = []
+    resolve_errors = []
+
+    for record in records:
+        fields = record.get('fields', {})
+        had_error = False
+
+        for field_name, related_model in fk_fields.items():
+            value = fields.get(field_name)
+            
+            if isinstance(value, list) and len(value) == 1:
+                uuid_str = value[0]
+                try:
+                    related_obj = related_model.objects.get(uuid_sinc=uuid_str)
+                    fields[field_name] = related_obj.pk
+                except related_model.DoesNotExist:
+                    uuid_sinc_val = fields.get('uuid_sinc', 'desconhecido')
+                    resolve_errors.append({
+                        'uuid': str(uuid_sinc_val),
+                        'error': f'{related_model.__name__} com uuid_sinc={uuid_str} não encontrado'
+                    })
+                    had_error = True
+                    break
+                except Exception as e:
+                    uuid_sinc_val = fields.get('uuid_sinc', 'desconhecido')
+                    resolve_errors.append({
+                        'uuid': str(uuid_sinc_val),
+                        'error': f'Erro ao resolver {field_name}: {e}'
+                    })
+                    had_error = True
+                    break
+            elif isinstance(value, list) and len(value) > 1:
+                try:
+                    related_obj = related_model.objects.get_by_natural_key(*value)
+                    fields[field_name] = related_obj.pk
+                except Exception:
+                    try:
+                        related_obj = related_model.objects.get(uuid_sinc=value[0])
+                        fields[field_name] = related_obj.pk
+                    except Exception as e:
+                        uuid_sinc_val = fields.get('uuid_sinc', 'desconhecido')
+                        resolve_errors.append({
+                            'uuid': str(uuid_sinc_val),
+                            'error': f'{related_model.__name__} NK={value} não encontrado'
+                        })
+                        had_error = True
+                        break
+        
+        if not had_error:
+            resolved_records.append(record)
+
+    return resolved_records, resolve_errors
+
+
 class Command(BaseCommand):
     help = 'Sincroniza dados entre a instância local e o servidor central'
 
@@ -249,8 +320,6 @@ class Command(BaseCommand):
                 models_to_retry.append((model_path, skipped_total))
 
         # --- SEGUNDA PASSAGEM: Re-tentar modelos com dependências em falta ---
-        # Depois de todos os modelos base terem sido puxados, as dependências
-        # que faltavam na 1ª passagem podem agora existir localmente.
         if models_to_retry:
             self.stdout.write(self.style.HTTP_INFO(
                 f'\n🔄 Segunda passagem: a re-tentar {len(models_to_retry)} modelos com registos ignorados...'
@@ -288,7 +357,6 @@ class Command(BaseCommand):
                 since_time = last_sync - timedelta(minutes=5) if last_sync else None
 
                 # Metadados base (Foundational) devem ser sempre puxados na totalidade 
-                # Adicionado CustomUser para garantir que todos os usuários existam localmente para FKs
                 if model_path in ['ARQUIVOS.Administracao', 'ARQUIVOS.TipoDocumento', 
                                   'ARQUIVOS.Departamento', 'ARQUIVOS.Seccoes', 'ARQUIVOS.CustomUser',
                                   'ARQUIVOS.ConfiguracaoSistema', 'ARQUIVOS.LocalArmazenamento']:
@@ -315,8 +383,6 @@ class Command(BaseCommand):
                     data = result.get('data', '[]')
                     count = result.get('count', 0)
 
-                    # ROBUSTEZ: Continuar enquanto houver registos, independentemente de batch_size
-                    # Isso evita parar se o servidor tiver um limite menor que o cliente
                     has_more = (count > 0)
 
                     if count == 0:
@@ -325,18 +391,28 @@ class Command(BaseCommand):
 
                     self.stdout.write(f'   📦 {model_path}: a receber {count} registos...')
 
-                    # Deserializar e salvar — REGISTO A REGISTO com transaction individual
                     try:
                         files_data_all = result.get('files', {})
                         file_fields = [f.name for f in model._meta.get_fields() if isinstance(f, (FileField, ImageField))]
 
                         import json as json_module
                         records = json_module.loads(data)
-                        skipped = 0
-                        for record in records:
+                        
+                        # === PRÉ-RESOLVER FKs por uuid_sinc ===
+                        resolved_records, fk_errors = _resolver_fks_no_json(records, model)
+                        skipped = len(fk_errors)
+                        
+                        if fk_errors:
+                            for err in fk_errors[:3]:
+                                self.stdout.write(self.style.WARNING(
+                                    f'   ⚠️ FK não resolvida em {model_path}: {err["error"]}'
+                                ))
+
+                        for record in resolved_records:
                             try:
                                 single_json = json_module.dumps([record])
-                                obj_list = list(deserialize('json', single_json, use_natural_foreign_keys=True))
+                                # use_natural_foreign_keys=False porque já resolvemos as FKs
+                                obj_list = list(deserialize('json', single_json))
                                 if not obj_list:
                                     continue
                                 obj = obj_list[0]
@@ -350,6 +426,7 @@ class Command(BaseCommand):
                             try:
                                 with transaction.atomic():
                                     instance = obj.object
+                                    instance._skip_validation = True
                                     uuid_str = str(instance.uuid_sinc)
                                     files_data = files_data_all.get(uuid_str, {})
 
@@ -399,6 +476,7 @@ class Command(BaseCommand):
                                                     content = base64.b64decode(f_data['content'])
                                                     getattr(existing, field_name).save(f_data['name'], ContentFile(content), save=False)
                                             
+                                            existing._skip_validation = True
                                             existing.save(update_fields=[f.name for f in model._meta.fields if not f.primary_key] + ['pendente_sinc'])
                                             instance = existing
                                         else:
@@ -411,6 +489,7 @@ class Command(BaseCommand):
                                                 getattr(instance, field_name).save(f_data['name'], ContentFile(content), save=False)
                                         
                                         instance.pendente_sinc = False
+                                        instance._skip_validation = True
                                         instance.save()
 
                                     # Marcar como sincronizado localmente

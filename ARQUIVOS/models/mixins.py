@@ -45,6 +45,9 @@ class SyncMixin(models.Model):
     Adiciona um UUID global (para evitar colisões de PK entre instâncias),
     um flag de sincronização pendente e um timestamp de última sincronização.
     """
+    # Flag transiente (não salvo no BD) para desabilitar full_clean() durante sync
+    _skip_validation = False
+
     uuid_sinc = models.UUIDField(
         default=uuid.uuid4,
         editable=False,

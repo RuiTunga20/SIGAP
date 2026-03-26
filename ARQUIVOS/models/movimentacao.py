@@ -5,6 +5,9 @@ from django.core.exceptions import ValidationError
 from ARQUIVOS.models.mixins import SyncMixin
 
 class MovimentacaoDocumento(SyncMixin):
+    def natural_key(self):
+        return (str(self.uuid_sinc),)
+
     TIPO_MOVIMENTACAO_CHOICES = [
         ('criacao', 'Criação'),
         ('recebimento', 'Recebimento'),
@@ -179,7 +182,8 @@ class MovimentacaoDocumento(SyncMixin):
                 })
 
     def save(self, *args, **kwargs):
-        self.full_clean()
+        if not self._skip_validation:
+            self.full_clean()
         super().save(*args, **kwargs)
 
     @property

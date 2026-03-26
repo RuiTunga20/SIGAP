@@ -8,6 +8,9 @@ class LocalArmazenamento(SyncMixin):
     Modelo para cadastrar locais físicos de armazenamento de documentos.
     Estrutura: Estante > Prateleira > Dossiê
     """
+    def natural_key(self):
+        return (str(self.uuid_sinc),)
+
     TIPO_CHOICES = [
         ('estante', 'Estante'),
         ('prateleira', 'Prateleira'),
@@ -102,6 +105,9 @@ class ArmazenamentoDocumento(SyncMixin):
     - Operador SEM permissão de reencaminhar dá entrada no documento
     - Operador COM permissão reencaminha o documento (após reencaminhamento)
     """
+    def natural_key(self):
+        return (str(self.uuid_sinc),)
+
     documento = models.ForeignKey(
         'Documento',
         on_delete=models.CASCADE,
@@ -209,7 +215,8 @@ class ArmazenamentoDocumento(SyncMixin):
             )
 
     def save(self, *args, **kwargs):
-        self.full_clean()
+        if not self._skip_validation:
+            self.full_clean()
         super().save(*args, **kwargs)
 
     class Meta:

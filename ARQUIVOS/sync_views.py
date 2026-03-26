@@ -29,6 +29,87 @@ from ARQUIVOS.models.sistema import ConfiguracaoSistema
 logger = logging.getLogger('sync')
 
 
+# ================================================================
+# Função auxiliar: Resolver referências FK (Natural Keys -> PKs)
+# ================================================================
+def _resolver_fks_no_json(records, model):
+    """
+    Pré-processa uma lista de registos JSON (formato Django serializer)
+    e substitui referências Natural Key (UUIDs) por PKs reais do servidor local.
+    
+    Quando serialize(..., use_natural_foreign_keys=True) é usado, FKs são escritas como:
+      "fields": { "administracao": ["uuid-aqui"] }
+    
+    Em vez de depender de get_by_natural_key() (que pode falhar se o UUID não existe),
+    esta função resolve cada FK manualmente usando uuid_sinc.
+    """
+    # Obter definição dos campos FK do modelo
+    fk_fields = {}
+    for field in model._meta.get_fields():
+        if hasattr(field, 'related_model') and field.related_model and hasattr(field, 'name'):
+            related_model = field.related_model
+            # Verificar se o modelo relacionado tem uuid_sinc
+            if hasattr(related_model, 'uuid_sinc'):
+                fk_fields[field.name] = related_model
+
+    resolved_records = []
+    resolve_errors = []
+
+    for record in records:
+        fields = record.get('fields', {})
+        had_error = False
+
+        for field_name, related_model in fk_fields.items():
+            value = fields.get(field_name)
+            
+            # Natural Key é uma lista: ["uuid-string"]
+            if isinstance(value, list) and len(value) == 1:
+                uuid_str = value[0]
+                try:
+                    related_obj = related_model.objects.get(uuid_sinc=uuid_str)
+                    fields[field_name] = related_obj.pk
+                except related_model.DoesNotExist:
+                    # UUID não existe neste servidor - registar o erro
+                    uuid_sinc_val = fields.get('uuid_sinc', 'desconhecido')
+                    resolve_errors.append({
+                        'uuid': str(uuid_sinc_val),
+                        'error': f'{related_model.__name__} com uuid_sinc={uuid_str} não encontrado'
+                    })
+                    had_error = True
+                    break
+                except Exception as e:
+                    uuid_sinc_val = fields.get('uuid_sinc', 'desconhecido')
+                    resolve_errors.append({
+                        'uuid': str(uuid_sinc_val),
+                        'error': f'Erro ao resolver {field_name}: {e}'
+                    })
+                    had_error = True
+                    break
+            elif isinstance(value, list) and len(value) > 1:
+                # Natural Key composta - tentar resolver via get_by_natural_key
+                try:
+                    related_obj = related_model.objects.get_by_natural_key(*value)
+                    fields[field_name] = related_obj.pk
+                except Exception:
+                    # Fallback: se a lista contém um UUID, tentar por uuid_sinc
+                    try:
+                        related_obj = related_model.objects.get(uuid_sinc=value[0])
+                        fields[field_name] = related_obj.pk
+                    except Exception as e:
+                        uuid_sinc_val = fields.get('uuid_sinc', 'desconhecido')
+                        resolve_errors.append({
+                            'uuid': str(uuid_sinc_val),
+                            'error': f'{related_model.__name__} NK={value} não encontrado'
+                        })
+                        had_error = True
+                        break
+        
+        if not had_error:
+            resolved_records.append(record)
+
+    return resolved_records, resolve_errors
+
+
 def sync_auth_required(view_func):
     """Decorador que valida o token de autenticação para a API de sync."""
     @wraps(view_func)
@@ -82,15 +163,20 @@ def sync_push(request):
         # Obter campos de arquivo para este modelo
         file_fields = [f.name for f in model._meta.get_fields() if isinstance(f, (FileField, ImageField))]
 
-        # Deserializar REGISTO A REGISTO para não perder todo o lote se um falhar
+        # === FASE 1: Pré-processar JSON para resolver FKs por uuid_sinc ===
         import json as json_module
         records = json_module.loads(data)
 
-        for record in records:
-            # Deserializar individualmente usando Natural Keys
+        # Resolver FKs ANTES da deserialização
+        resolved_records, fk_errors = _resolver_fks_no_json(records, model)
+        skipped_records.extend(fk_errors)
+
+        # === FASE 2: Processar os registos com FKs resolvidas ===
+        for record in resolved_records:
             try:
                 single_json = json_module.dumps([record])
-                obj_list = list(deserialize('json', single_json, use_natural_foreign_keys=True))
+                # use_natural_foreign_keys=False porque já resolvemos as FKs manualmente
+                obj_list = list(deserialize('json', single_json))
                 if not obj_list:
                     continue
                 obj = obj_list[0]
@@ -106,6 +192,8 @@ def sync_push(request):
             try:
                 with transaction.atomic():
                     instance = obj.object
+                    # Desabilitar validação durante sync
+                    instance._skip_validation = True
                     uuid_sinc = instance.uuid_sinc
 
                     # Extrair arquivos do JSON estendido
@@ -165,6 +253,7 @@ def sync_push(request):
                                     content = base64.b64decode(field_data['content'])
                                     getattr(existing, field_name).save(field_data['name'], ContentFile(content), save=False)
                             
+                            existing._skip_validation = True
                             try:
                                 update_fields = [f.name for f in model._meta.fields if not f.primary_key and not isinstance(f, (FileField, ImageField))] + ['pendente_sinc']
                                 existing.save(update_fields=update_fields)
@@ -190,6 +279,7 @@ def sync_push(request):
                                 getattr(instance, field_name).save(field_data['name'], ContentFile(content), save=False)
                         
                         instance.pendente_sinc = False
+                        instance._skip_validation = True
                         try:
                             instance.save()
                         except Exception as save_err:
@@ -236,7 +326,7 @@ def sync_push(request):
         return JsonResponse({
             'status': 'ok',
             'synced_uuids': synced_uuids,
-            'skipped_records': skipped_records, # Novo formato detalhado
+            'skipped_records': skipped_records,
             'count': len(synced_uuids),
             'skipped': len(skipped_records),
         })

@@ -6,6 +6,9 @@ class ConfiguracaoSistema(SyncMixin):
     """
     Configurações gerais do sistema
     """
+    def natural_key(self):
+        return (str(self.uuid_sinc),)
+
     chave = models.CharField(max_length=100, unique=True)
     valor = models.TextField()
     descricao = models.TextField(blank=True)
@@ -36,6 +39,9 @@ class Notificacao(SyncMixin):
     Modelo simplificado para notificações.
     Cada notificação é criada diretamente para um usuário específico.
     """
+    def natural_key(self):
+        return (str(self.uuid_sinc),)
+
     usuario = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='notificacoes')
     mensagem = models.CharField(max_length=255)
     link = models.URLField(max_length=255, blank=True, null=True)
