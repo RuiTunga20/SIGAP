@@ -91,7 +91,20 @@
                     <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-y-6 gap-x-8">
                         <div>
                             <p class="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">Origem / Entidade</p>
-                            <p class="text-sm font-bold text-slate-700 leading-snug">{{ documento.get_origem_display }}</p>
+                            <div class="flex items-center justify-between items-start gap-4">
+                                <p class="text-sm font-bold text-slate-700 leading-snug">
+                                    {% if documento.remetente %}
+                                        {{ documento.remetente.nome }}
+                                    {% else %}
+                                        {{ documento.get_origem_display }}
+                                    {% endif %}
+                                </p>
+                                {% if documento.remetente %}
+                                <a href="{% url 'utente_ficha' documento.remetente.id %}" class="flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-lg text-[10px] font-black uppercase transition-all">
+                                    <i data-lucide="history" class="w-3.5 h-3.5"></i> Ver Antecedentes
+                                </a>
+                                {% endif %}
+                            </div>
                         </div>
                         <div>
                             <p class="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">Prioridade</p>

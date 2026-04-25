@@ -30,7 +30,7 @@ import os
 # Importações Locais
 from .models import (
     Documento, MovimentacaoDocumento, Departamento, Seccoes, Anexo, StatusDocumento, Notificacao, CustomUser, Seccoes,
-    ArmazenamentoDocumento, LocalArmazenamento, Administracao
+    ArmazenamentoDocumento, LocalArmazenamento, Administracao, Utente
 )
 from .formularios import (
     DocumentoForm, EncaminharDocumentoForm, DespachoForm,
@@ -2531,3 +2531,37 @@ def preparar_despacho(request, documento_id, action):
         'action_label': status_alvo.upper()
     }
     return render(request, 'Paginaseditar_despacho.html', context)
+
+@login_required
+@requer_mesma_administracao
+def utente_ficha(request, utente_id):
+    """
+    Visualização da Ficha de Antecedentes de um Utente.
+    Implementa isolamento Multi-Tenant: o usuário só vê o histórico
+    relativo à sua própria Administração/Governo/MAT.
+    """
+    utente = get_object_or_404(Utente, id=utente_id)
+    user_admin = request.user.administracao
+
+    # Filtrar documentos do utente apenas para a administração do usuário logado
+    historico = Documento.objects.filter(
+        remetente=utente,
+        administracao=user_admin
+    ).select_related('tipo_documento', 'departamento_atual').order_by('-data_criacao')
+
+    # Estatísticas rápidas
+    stats = {
+        'total': historico.count(),
+        'arquivados': historico.filter(status='arquivado').count(),
+        'em_andamento': historico.exclude(status__in=['arquivado', 'finalizado']).count(),
+    }
+
+    context = {
+        'utente': utente,
+        'historico': historico,
+        'stats': stats,
+        'user_admin': user_admin,
+        'titulo_pagina': f'Ficha de Antecedentes: {utente.nome}'
+    }
+    
+    return render(request, 'Paginasutente_ficha.html', context)

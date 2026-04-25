@@ -58,7 +58,8 @@ path('notificacoes/marcar-como-lidas/', views.marcar_notificacoes_como_lidas, na
     # Armazenamento de Documentos
     path('documentos/<int:documento_id>/armazenamento/', views.registrar_armazenamento, name='registrar_armazenamento'),
     path('armazenamentos/', views.listar_armazenamentos, name='listar_armazenamentos'),
-    path('documentos/<int:documento_id>/armazenamentos/', views.listar_armazenamentos, name='historico_armazenamento'),
+    # Ficha de Antecedentes (Utente)
+    path('utente/<int:utente_id>/ficha/', views.utente_ficha, name='utente_ficha'),
 
     # Visualização de Arquivos
     path('documentos/<int:documento_id>/arquivo/<str:tipo>/', views.visualizar_arquivo, name='visualizar_arquivo'),
