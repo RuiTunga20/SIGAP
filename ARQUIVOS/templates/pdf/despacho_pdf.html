@@ -187,7 +187,8 @@
                 <td class="direita">
                     AO<br>
                     EXMO SENHOR<br>
-                    {{ documento.utente|upper }}<br>
+                    {{ documento.remetente.nome|upper }}<br>
+
                     <span class="cidade">{{ admin.provincia|upper }}</span>
                 </td>
             </tr>

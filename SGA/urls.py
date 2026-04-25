@@ -52,6 +52,7 @@ path('notificacoes/marcar-como-lidas/', views.marcar_notificacoes_como_lidas, na
     path('ajax/load-departamentos/', views.load_departamentos, name='ajax_load_departamentos'),
     path('ajax/load-seccoes/', views.load_seccoes, name='ajax_load_seccoes'),
     path('ajax/busca/', views.busca_ajax, name='busca_ajax'),
+    path('ajax/busca-utente/', views.busca_utente_ajax, name='busca_utente_ajax'),
 #    path('ajax/confirmar-recebimento/', views.confirmar_recebimento_ajax, name='confirmar_recebimento_ajax'),
 
     # Armazenamento de Documentos

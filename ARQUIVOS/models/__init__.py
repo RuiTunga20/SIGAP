@@ -5,3 +5,4 @@ from .usuario import Administracao, CustomUser, GovernoProvincial, Administracao
 from .documento import TipoDocumento, Documento, Anexo, StatusDocumento
 from .movimentacao import MovimentacaoDocumento
 from .armazenamento import LocalArmazenamento, ArmazenamentoDocumento
+from .utente import Utente

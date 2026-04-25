@@ -546,7 +546,7 @@ def detalhe_documento(request, documento_id):
 
     # --- INICIALIZAÇÃO DE FORMULÁRIOS (COM PREFIXOS PARA EVITAR COLISÃO DE IDs) ---
     encaminhar_form = EncaminharDocumentoForm(user=request.user, documento=documento, prefix='enc')
-    despacho_form = DespachoForm(prefix='desp')
+    despacho_form = DespachoForm(user=request.user, prefix='desp')
     
     # Lógica de Distribuição (Chefia -> Técnico)
     pode_distribuir = False
@@ -816,11 +816,11 @@ def detalhe_documento(request, documento_id):
 
         # === AÇÃO 2: DESPACHO (Apenas Admins) ===
         elif action == 'despacho':
-            if not e_administrador:
-                messages.error(request, 'Apenas administradores podem adicionar despacho.')
+            if not e_administrador and not is_expediente:
+                messages.error(request, 'Apenas administradores ou pessoal do expediente podem adicionar despacho.')
                 return redirect('detalhe_documento', documento_id=documento.id)
 
-            despacho_form = DespachoForm(request.POST, prefix='desp')
+            despacho_form = DespachoForm(request.POST, user=request.user, prefix='desp')
             if despacho_form.is_valid():
                 # Cria movimentação de despacho
                 MovimentacaoDocumento.objects.create(
@@ -862,7 +862,7 @@ def detalhe_documento(request, documento_id):
                     
                     # 3. Preparar contexto para notificações
                     email_context = {
-                        'utente': documento.utente or "Utente",
+                        'utente': documento.remetente.nome or "Utente",
                         'protocolo': documento.numero_protocolo,
                         'titulo': documento.titulo,
                         'status': documento.get_status_display(),
@@ -871,7 +871,7 @@ def detalhe_documento(request, documento_id):
                     }
                     
                     notificou_email = False
-                    if documento.email:
+                    if documento.remetente.email:
                         assunto = f"Notificação de Despacho - Protocolo {documento.numero_protocolo}"
                         mensagem_html = render_to_string('emails/despacho_email.html', email_context)
                         
@@ -879,7 +879,7 @@ def detalhe_documento(request, documento_id):
                             assunto,
                             mensagem_html,
                             None, # De (usará o DEFAULT_FROM_EMAIL)
-                            [documento.email]
+                            [documento.remetente.email]
                         )
                         email.content_subtype = "html" # Define como HTML
                         
@@ -890,9 +890,9 @@ def detalhe_documento(request, documento_id):
                         notificou_email = True
                         
                     notificou_wp = False
-                    if documento.telefone:
+                    if documento.remetente.telefone:
                         notificou_wp = enviar_whatsapp_notificacao(
-                            documento.telefone, 
+                            documento.remetente.telefone, 
                             email_context, 
                             pdf_file=pdf_content, 
                             pdf_name=pdf_content.name
@@ -900,11 +900,11 @@ def detalhe_documento(request, documento_id):
                     
                     msg_sucesso = "Despacho registado."
                     if notificou_email and notificou_wp:
-                        msg_sucesso += f" Notificação enviada por email ({documento.email}) e WhatsApp ({documento.telefone})."
+                        msg_sucesso += f" Notificação enviada por email ({documento.remetente.email}) e WhatsApp ({documento.remetente.telefone})."
                     elif notificou_email:
-                        msg_sucesso += f" Notificação enviada para {documento.email}."
+                        msg_sucesso += f" Notificação enviada para {documento.remetente.email}."
                     elif notificou_wp:
-                        msg_sucesso += f" Notificação enviada por WhatsApp para {documento.telefone}."
+                        msg_sucesso += f" Notificação enviada por WhatsApp para {documento.remetente.telefone}."
                     else:
                         msg_sucesso += " (Sem canais de notificação)"
                         
@@ -921,7 +921,14 @@ def detalhe_documento(request, documento_id):
 
         # === AÇÃO 3: FINALIZAÇÃO (Aprovado/Reprovado/Arquivado) ===
         elif action in [StatusDocumento.APROVADO, StatusDocumento.REPROVADO, StatusDocumento.ARQUIVADO]:
-            if not e_administrador:
+            # REGRA: Só o expediente arquiva
+            if action == StatusDocumento.ARQUIVADO:
+                from .hierarchy_manager import _is_expediente
+                if not _is_expediente(user_seccao) and not request.user.is_superuser:
+                    messages.error(request, 'Ação de Arquivar restrita à Secção de Expediente.')
+                    return redirect('detalhe_documento', documento_id=documento.id)
+
+            if not e_administrador and action != StatusDocumento.ARQUIVADO:
                 messages.error(request, 'Apenas administradores podem executar esta ação.')
                 return redirect('detalhe_documento', documento_id=documento.id)
 
@@ -971,7 +978,7 @@ def detalhe_documento(request, documento_id):
                     documento.arquivo_digitalizado.save(pdf_content.name, pdf_content, save=False)
                     
                     email_context = {
-                        'utente': documento.utente or "Utente",
+                        'utente': documento.remetente.nome or "Utente",
                         'protocolo': documento.numero_protocolo,
                         'titulo': documento.titulo,
                         'status': documento.get_status_display(),
@@ -979,23 +986,23 @@ def detalhe_documento(request, documento_id):
                         'ano': timezone.now().year
                     }
 
-                    if documento.email:
+                    if documento.remetente.email:
                         assunto = f"Notificação de Decisão Final - Protocolo {documento.numero_protocolo}"
                         mensagem_html = render_to_string('emails/despacho_email.html', email_context)
                         email_msg = EmailMessage(
                             assunto,
                             mensagem_html,
                             None,
-                            [documento.email]
+                            [documento.remetente.email]
                         )
                         email_msg.content_subtype = "html"
                         pdf_content.seek(0)
                         email_msg.attach(pdf_content.name, pdf_content.read(), 'application/pdf')
                         email_msg.send(fail_silently=False)
                         
-                    if documento.telefone:
+                    if documento.remetente.telefone:
                         enviar_whatsapp_notificacao(
-                            documento.telefone, 
+                            documento.remetente.telefone, 
                             email_context, 
                             pdf_file=pdf_content, 
                             pdf_name=pdf_content.name
@@ -1051,18 +1058,23 @@ def detalhe_documento(request, documento_id):
 
             return redirect('detalhe_documento', documento_id=documento.id)
 
-    # Contexto para o Template
+    # Resolver flag de Expediente para permissões de Arquivo
+    from .hierarchy_manager import _is_expediente
+    is_expediente = _is_expediente(user_seccao)
+
     context = {
         'documento': documento,
         'movimentacoes': movimentacoes,
         'movimentacoes_pendentes': movimentacoes_pendentes,
         'pode_encaminhar': pode_encaminhar,
         'e_administrador': e_administrador,
+        'is_expediente': is_expediente,
+        'pode_arquivar': is_expediente or request.user.is_superuser,
         'encaminhar_form': encaminhar_form,
         'despacho_form': despacho_form,
         'distribuir_form': distribuir_form,
         'pode_distribuir': pode_distribuir,
-        'observacoes': observacoes,
+        'observacoes': observacoes_qs,
     }
 
     return render(request, 'Paginasdetalhe.html', context)
@@ -1089,6 +1101,34 @@ def criar_documento(request):
         if form.is_valid():
             documento = form.save(commit=False)
             documento.criado_por = request.user
+
+            # --- LÓGICA DE UTENTE (UX HÍBRIDO) ---
+            from ARQUIVOS.models import Utente
+            remetente = form.cleaned_data.get('remetente')
+            input_nif = form.cleaned_data.get('input_nif')
+            input_nome = form.cleaned_data.get('input_nome')
+            input_telefone = form.cleaned_data.get('input_telefone')
+            input_email = form.cleaned_data.get('input_email')
+            input_origem = form.cleaned_data.get('input_origem')
+
+            if not remetente:
+                if not input_nome:
+                    messages.error(request, 'O Nome do Utente/Remetente é obrigatório.')
+                    return render(request, 'Paginascriar.html', {'form': form, 'dados': dados})
+                
+                if input_nif:
+                    remetente = Utente.objects.filter(nif=input_nif).first()
+                
+                if not remetente:
+                    remetente = Utente.objects.create(
+                        nome=input_nome,
+                        nif=input_nif if input_nif else None,
+                        telefone=input_telefone,
+                        email=input_email,
+                        tipo=input_origem or 'Pessoa Singular',
+                        administracao=getattr(request.user, 'administracao', None)
+                    )
+            documento.remetente = remetente
 
             # Verificação de departamento
             if not departamento_usuario:
@@ -1223,7 +1263,36 @@ def Editar_documento(request, id):
         form = DocumentoForm(request.POST, request.FILES, instance=documento)
 
         if form.is_valid():
-            form.save()
+            documento = form.save(commit=False)
+            
+            # --- LÓGICA DE UTENTE (UX HÍBRIDO) ---
+            from ARQUIVOS.models import Utente
+            remetente = form.cleaned_data.get('remetente')
+            input_nif = form.cleaned_data.get('input_nif')
+            input_nome = form.cleaned_data.get('input_nome')
+            input_telefone = form.cleaned_data.get('input_telefone')
+            input_email = form.cleaned_data.get('input_email')
+            input_origem = form.cleaned_data.get('input_origem')
+
+            if not remetente:
+                if not input_nome:
+                    messages.error(request, 'O Nome do Utente/Remetente é obrigatório.')
+                    return render(request, 'Paginascriar.html', {'form': form, 'dados': {}})
+                
+                if input_nif:
+                    remetente = Utente.objects.filter(nif=input_nif).first()
+                
+                if not remetente:
+                    remetente = Utente.objects.create(
+                        nome=input_nome,
+                        nif=input_nif if input_nif else None,
+                        telefone=input_telefone,
+                        email=input_email,
+                        tipo=input_origem or 'Pessoa Singular',
+                        administracao=getattr(request.user, 'administracao', None)
+                    )
+            documento.remetente = remetente
+            documento.save()
             messages.success(request, f'Documento "{documento.titulo}" atualizado com sucesso!')
             return redirect('editar_documento', id=documento.id)
         else:
@@ -1832,6 +1901,35 @@ def busca_ajax(request):
 #  AJAX VIEWS FOR DEPENDENT DROPDOWNS (ADMIN)
 # ==============================================================================
 
+from django.http import JsonResponse as _JsonResponse
+
+@login_required
+def busca_utente_ajax(request):
+    """
+    Pesquisa um Utente pelo NIF/BI via AJAX.
+    Retorna JSON com os dados do utente se encontrado.
+    """
+    from ARQUIVOS.models import Utente
+    nif = request.GET.get('nif', '').strip()
+    
+    if not nif:
+        return _JsonResponse({'encontrado': False})
+    
+    utente = Utente.objects.filter(nif=nif).first()
+    
+    if utente:
+        return _JsonResponse({
+            'encontrado': True,
+            'id': utente.id,
+            'nome': utente.nome,
+            'telefone': utente.telefone or '',
+            'email': utente.email or '',
+            'tipo': utente.tipo or '',
+        })
+    
+    return _JsonResponse({'encontrado': False})
+
+
 def load_departamentos(request):
     """
     Retorna os departamentos de uma determinada administração (AJAX).
@@ -1885,6 +1983,13 @@ def registrar_armazenamento(request, documento_id):
     """
     documento = get_object_or_404(Documento, id=documento_id)
     user = request.user
+    
+    # REGRA: Só o expediente armazena/arquiva
+    from .hierarchy_manager import _is_expediente
+    user_seccao = getattr(user, 'seccao', None)
+    if not _is_expediente(user_seccao) and not user.is_superuser:
+        messages.error(request, 'O registro de armazenamento físico é restrito à Secção de Expediente.')
+        return redirect('detalhe_documento', documento_id=documento.id)
     
     # Obter departamento e secção do usuário
     departamento_usuario = None
@@ -2220,7 +2325,7 @@ def editar_despacho(request, movimentacao_id):
     documento = movimentacao.documento
     
     if request.method == 'POST':
-        form = DespachoForm(request.POST, prefix='desp')
+        form = DespachoForm(request.POST, user=request.user, prefix='desp')
         if form.is_valid():
             with transaction.atomic():
                 # 1. Atualizar a movimentação
@@ -2243,7 +2348,7 @@ def editar_despacho(request, movimentacao_id):
                     
                     # 4. Enviar notificação de correção (opcional/simplificado)
                     email_context = {
-                        'utente': documento.utente or "Utente",
+                        'utente': documento.remetente.nome or "Utente",
                         'protocolo': documento.numero_protocolo,
                         'titulo': documento.titulo,
                         'status': documento.get_status_display(),
@@ -2252,18 +2357,18 @@ def editar_despacho(request, movimentacao_id):
                         'correcao': True
                     }
                     
-                    if documento.email:
+                    if documento.remetente.email:
                          assunto = f"CORREÇÃO: Notificação de Despacho - Protocolo {documento.numero_protocolo}"
                          mensagem_html = render_to_string('emails/despacho_email.html', email_context)
-                         email = EmailMessage(assunto, mensagem_html, None, [documento.email])
+                         email = EmailMessage(assunto, mensagem_html, None, [documento.remetente.email])
                          email.content_subtype = "html"
                          pdf_content.seek(0)
                          email.attach(pdf_content.name, pdf_content.read(), 'application/pdf')
                          email.send(fail_silently=True)
 
-                    if documento.telefone:
+                    if documento.remetente.telefone:
                          enviar_whatsapp_notificacao(
-                             documento.telefone, 
+                             documento.remetente.telefone, 
                              email_context, 
                              pdf_file=pdf_content, 
                              pdf_name=pdf_content.name
@@ -2279,7 +2384,7 @@ def editar_despacho(request, movimentacao_id):
             'despacho': movimentacao.despacho,
             'novo_status': documento.status if documento.status in [StatusDocumento.APROVADO, StatusDocumento.REPROVADO, StatusDocumento.ARQUIVADO] else ''
         }
-        form = DespachoForm(initial=initial_data, prefix='desp')
+        form = DespachoForm(initial=initial_data, user=request.user, prefix='desp')
     
     return render(request, 'Paginaseditar_despacho.html', {
         'form': form,
@@ -2372,7 +2477,7 @@ def preparar_despacho(request, documento_id, action):
         texto_inicial = ultimo_parecer.despacho or ultimo_parecer.observacoes
 
     if request.method == 'POST':
-        form = DespachoForm(request.POST, prefix='desp')
+        form = DespachoForm(request.POST, user=request.user, prefix='desp')
         # Ajustamos o prefixo para 'desp' para ser compatível com o template Paginaseditar_despacho
         if form.is_valid():
             final_texto = form.cleaned_data['despacho']
@@ -2418,7 +2523,7 @@ def preparar_despacho(request, documento_id, action):
             return redirect('detalhe_documento', documento_id=documento.id)
     else:
         # GET - Preenche o formulário
-        form = DespachoForm(initial={'despacho': texto_inicial, 'novo_status': status_alvo}, prefix='desp')
+        form = DespachoForm(initial={'despacho': texto_inicial, 'novo_status': status_alvo}, user=request.user, prefix='desp')
 
     context = {
         'documento': documento,

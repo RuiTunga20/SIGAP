@@ -4,7 +4,7 @@ from .models import (
     CustomUser, Departamento, TipoDocumento, Documento,
     MovimentacaoDocumento, Anexo, ConfiguracaoSistema, Notificacao, Seccoes,
     LocalArmazenamento, ArmazenamentoDocumento, Administracao, GovernoProvincial, AdministracaoMunicipal,
-    Ministerio
+    Ministerio, Utente
 )
 
 
@@ -205,15 +205,24 @@ class TipoDocumentoAdmin(admin.ModelAdmin):
     list_filter = ('ativo',)
 
 
+@admin.register(Utente)
+class UtenteAdmin(AdminMultiTenantMixin, admin.ModelAdmin):
+    list_display = ('nome', 'nif', 'telefone', 'email', 'tipo', 'administracao')
+    list_filter = ('tipo', 'administracao')
+    search_fields = ('nome', 'nif', 'telefone', 'email')
+    ordering = ('nome',)
+    autocomplete_fields = ['administracao']
+
+
 @admin.register(Documento)
 class DocumentoAdmin(AdminMultiTenantMixin, admin.ModelAdmin):
     list_display = ('numero_protocolo', 'titulo', 'status', 'prioridade', 'departamento_atual', 'data_criacao')
     list_filter = ('status', 'prioridade', 'tipo_documento', 'departamento_atual')
-    search_fields = ('numero_protocolo', 'titulo', 'tags', 'utente', 'conteudo')
+    search_fields = ('numero_protocolo', 'titulo', 'tags', 'remetente__nome', 'conteudo')
     readonly_fields = ('numero_protocolo', 'data_criacao')
     
     # Autocomplete para campos ForeignKey
-    autocomplete_fields = ['tipo_documento', 'departamento_origem', 'departamento_atual', 'seccao_atual', 'criado_por', 'responsavel_atual']
+    autocomplete_fields = ['tipo_documento', 'departamento_origem', 'departamento_atual', 'seccao_atual', 'criado_por', 'responsavel_atual', 'remetente']
 
 
 @admin.register(MovimentacaoDocumento)

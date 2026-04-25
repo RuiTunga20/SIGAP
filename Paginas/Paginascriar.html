@@ -141,22 +141,42 @@
                     <h3 class="text-xs font-black uppercase tracking-widest text-slate-500">Origem e Remetente</h3>
                 </div>
                 <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- Campo NIF com Botão de Pesquisa Integrado -->
                     <div class="space-y-1.5 focus-within:text-sga-red transition-colors">
-                        <label for="id_origem" class="text-xs font-bold text-slate-600 block mb-1 uppercase tracking-wider">Departamento / Entidade de Origem</label>
-                        {{ form.origem }}
+                        <label for="id_input_nif" class="text-xs font-bold text-slate-600 block mb-1 uppercase tracking-wider">NIF / BI</label>
+                        <div class="relative group">
+                            {{ form.input_nif }}
+                            <button type="button" id="btn-buscar-nif"
+                                class="absolute right-2 top-1/2 -translate-y-1/2 h-10 w-10 flex items-center justify-center bg-sga-red hover:bg-red-700 text-white rounded-xl transition-all shadow-sm hover:shadow-md active:scale-90 z-10"
+                                title="Pesquisar Utente pelo NIF">
+                                <i data-lucide="search" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                        <!-- Indicador de estado da pesquisa -->
+                        <div id="nif-status" class="hidden text-[11px] font-bold px-2 py-1 rounded-lg mt-1"></div>
                     </div>
+                    <!-- Nome do Remetente -->
                     <div class="space-y-1.5 focus-within:text-sga-red transition-colors">
-                        <label for="id_utente" class="text-xs font-bold text-slate-600 block mb-1 uppercase tracking-wider">Nome do Remetente / Utente</label>
-                        {{ form.utente }}
+                        <label for="id_input_nome" class="text-xs font-bold text-slate-600 block mb-1 uppercase tracking-wider">Nome do Remetente / Utente</label>
+                        {{ form.input_nome }}
                     </div>
+                    <!-- Telefone -->
                     <div class="space-y-1.5 focus-within:text-sga-red transition-colors">
-                        <label for="id_telefone" class="text-xs font-bold text-slate-600 block mb-1 uppercase tracking-wider">Telefone de Contacto</label>
-                        {{ form.telefone }}
+                        <label for="id_input_telefone" class="text-xs font-bold text-slate-600 block mb-1 uppercase tracking-wider">Telefone de Contacto</label>
+                        {{ form.input_telefone }}
                     </div>
+                    <!-- E-mail -->
                     <div class="space-y-1.5 focus-within:text-sga-red transition-colors">
-                        <label for="id_email" class="text-xs font-bold text-slate-600 block mb-1 uppercase tracking-wider">E-mail Institucional</label>
-                        {{ form.email }}
+                        <label for="id_input_email" class="text-xs font-bold text-slate-600 block mb-1 uppercase tracking-wider">E-mail Institucional</label>
+                        {{ form.input_email }}
                     </div>
+                    <!-- Tipo Entidade / Origem -->
+                    <div class="space-y-1.5 focus-within:text-sga-red transition-colors">
+                        <label for="id_input_origem" class="text-xs font-bold text-slate-600 block mb-1 uppercase tracking-wider">Departamento / Entidade de Origem</label>
+                        {{ form.input_origem }}
+                    </div>
+                    <!-- Hidden: remetente FK -->
+                    {{ form.remetente }}
                 </div>
             </div>
 
@@ -184,7 +204,7 @@
                     <i data-lucide="paperclip" class="w-4 h-4 text-emerald-500"></i>
                     <h3 class="text-xs font-black uppercase tracking-widest text-slate-500">Documentos Anexos (PDF)</h3>
                 </div>
-                <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div class="p-6">
                     <!-- Arquivo Principal -->
                     <div class="space-y-4">
                         <div class="flex items-center justify-between mb-1">
@@ -204,28 +224,6 @@
                                 {{ form.arquivo }}
                             </label>
                         </div>
-                    </div>
-
-                    <!-- Arquivo Digitalizado -->
-                    <div class="space-y-4">
-                         <div class="flex items-center justify-between mb-1">
-                            <label class="text-xs font-bold text-slate-600 uppercase tracking-wider">Arquivo Digitalizado (Opcional)</label>
-                            {% if form.instance.arquivo_digitalizado %}
-                                <a href="{{ form.instance.arquivo_digitalizado.url }}" target="_blank" class="text-[10px] font-bold text-sga-blue flex items-center gap-1 hover:underline">
-                                    <i data-lucide="external-link" class="w-3 h-3"></i> Atual
-                                </a>
-                            {% endif %}
-                        </div>
-                        <div class="relative group">
-                            <label class="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-slate-200 rounded-xl hover:border-sga-red hover:bg-red-50 transition-all cursor-pointer bg-slate-50">
-                                <div class="flex flex-col items-center justify-center pt-5 pb-6">
-                                    <i data-lucide="scan" class="w-8 h-8 text-slate-400 group-hover:text-sga-red transition-colors mb-2"></i>
-                                    <p class="text-xs text-slate-500 group-hover:text-sga-dark transition-colors font-medium">Anexar Digitalização</p>
-                                </div>
-                                {{ form.arquivo_digitalizado }}
-                            </label>
-                        </div>
-                    </div>
                 </div>
             </div>
 
@@ -261,6 +259,12 @@
                 }
             });
 
+            // Padding extra no input NIF para não sobrepor o botão de pesquisa
+            const nifInput = document.getElementById('id_input_nif');
+            if (nifInput) {
+                nifInput.style.paddingRight = '3.5rem';
+            }
+
             // Estilizar inputs de arquivo
             document.querySelectorAll('input[type="file"]').forEach(input => {
                 input.className = "hidden";
@@ -281,6 +285,100 @@
                     width: '100%',
                     minimumResultsForSearch: 8
                 });
+            });
+
+            // ============================================
+            // PESQUISA AJAX DE UTENTE POR NIF
+            // ============================================
+            const btnBuscar = document.getElementById('btn-buscar-nif');
+            const inputNif = document.getElementById('id_input_nif');
+            const inputNome = document.getElementById('id_input_nome');
+            const inputTelefone = document.getElementById('id_input_telefone');
+            const inputEmail = document.getElementById('id_input_email');
+            const inputOrigem = document.getElementById('id_input_origem');
+            const hiddenRemetente = document.getElementById('id_remetente');
+            const nifStatus = document.getElementById('nif-status');
+
+            function mostrarStatus(msg, tipo) {
+                nifStatus.classList.remove('hidden', 'bg-emerald-100', 'text-emerald-700', 'bg-amber-100', 'text-amber-700', 'bg-red-100', 'text-red-700');
+                if (tipo === 'ok') {
+                    nifStatus.classList.add('bg-emerald-100', 'text-emerald-700');
+                } else if (tipo === 'novo') {
+                    nifStatus.classList.add('bg-amber-100', 'text-amber-700');
+                } else {
+                    nifStatus.classList.add('bg-red-100', 'text-red-700');
+                }
+                nifStatus.textContent = msg;
+            }
+
+            function buscarUtente() {
+                const nif = inputNif.value.trim();
+                if (!nif) {
+                    nifStatus.classList.add('hidden');
+                    return;
+                }
+
+                // Animação de loading no botão
+                btnBuscar.disabled = true;
+                btnBuscar.innerHTML = '<svg class="animate-spin w-5 h-5" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>';
+
+                fetch(`/ajax/busca-utente/?nif=${encodeURIComponent(nif)}`)
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.encontrado) {
+                            // Preencher campos automaticamente
+                            inputNome.value = data.nome;
+                            inputTelefone.value = data.telefone;
+                            inputEmail.value = data.email;
+                            hiddenRemetente.value = data.id;
+                            
+                            // Preencher o select de Origem/Entidade
+                            if (inputOrigem && data.tipo) {
+                                inputOrigem.value = data.tipo;
+                                // Refrescar Select2 se ativo
+                                if (window.jQuery && jQuery(inputOrigem).data('select2')) {
+                                    jQuery(inputOrigem).trigger('change');
+                                }
+                            }
+
+                            // Feedback visual positivo
+                            mostrarStatus(`✓ Utente encontrado: ${data.nome}`, 'ok');
+
+                            // Efeito visual nos campos preenchidos
+                            [inputNome, inputTelefone, inputEmail].forEach(el => {
+                                el.style.borderColor = '#10b981';
+                                setTimeout(() => { el.style.borderColor = ''; }, 2000);
+                            });
+                        } else {
+                            // Limpar o hidden (será criado no servidor ao salvar)
+                            hiddenRemetente.value = '';
+                            mostrarStatus('⚠ NIF não registado. Preencha os dados para cadastrar automaticamente.', 'novo');
+                        }
+                    })
+                    .catch(() => {
+                        mostrarStatus('✕ Erro na pesquisa. Tente novamente.', 'erro');
+                    })
+                    .finally(() => {
+                        btnBuscar.disabled = false;
+                        btnBuscar.innerHTML = '<i data-lucide="search" class="w-5 h-5"></i>';
+                        if (window.lucide) lucide.createIcons();
+                    });
+            }
+
+            // Evento do botão lupa
+            btnBuscar.addEventListener('click', buscarUtente);
+
+            // Pesquisa automática ao sair do campo NIF (blur)
+            inputNif.addEventListener('blur', function() {
+                if (this.value.trim().length >= 9) {
+                    buscarUtente();
+                }
+            });
+
+            // Limpar estado ao modificar o NIF manualmente
+            inputNif.addEventListener('input', function() {
+                hiddenRemetente.value = '';
+                nifStatus.classList.add('hidden');
             });
         });
     </script>

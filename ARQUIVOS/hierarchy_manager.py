@@ -27,6 +27,17 @@ def _is_secretaria_geral(departamento) -> bool:
     return "secretaria geral" in departamento.nome.lower()
 
 
+def _is_expediente(seccao) -> bool:
+    """
+    Verifica se uma secção é de Expediente ou Secretaria.
+    Utilizado para conceder permissões de Arquivo e Despacho Direto.
+    """
+    if not seccao:
+        return False
+    nome = seccao.nome.lower()
+    return "expediente" in nome or "secretaria" in nome or "secretariado" in nome or "recepção" in nome
+
+
 def _is_gabinete(departamento) -> bool:
     """
     Verifica se um departamento é um Gabinete (político/executivo).
@@ -350,6 +361,13 @@ def _calcular_destinos_permitidos(user, ctx=None, incluir_self=True):
     # A chefia está no mesmo Departamento ou Secção.
     # Portanto, a única opção de destino é o PRÓPRIO local de trabalho.
     if getattr(user, 'eh_tecnico', False):
+         # EXCEÇÃO: Técnicos do Expediente podem despachar para QUALQUER direção/gabinete da base.
+         if em_seccao and _is_expediente(seccao):
+             # Define qs_dept_base aqui para usar abaixo (já calculada mais à frente, vamos antecipar a lógica básica de filtragem por admin)
+             qs_dept_base = Departamento.objects.filter(administracao=admin)
+             qs_seccoes = Seccoes.objects.filter(departamento__administracao=admin)
+             return qs_dept_base.order_by('nome'), qs_seccoes.order_by('nome'), False
+
          if em_seccao:
              # Se está em secção, só pode enviar para a PRÓPRIA secção (Chefia da Secção)
              # Não vê departamentos.

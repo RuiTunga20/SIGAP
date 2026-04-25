@@ -131,11 +131,13 @@ class Documento(SoftDeleteModel, AuditoriaModel, SyncMixin):
     observacoes = models.TextField(blank=True, help_text="Conteúdo do documento", null=True)
 
 
-    utente = models.CharField('Remetente', max_length=200, null=True, blank=True)
-    telefone = models.CharField(max_length=9, validators=[RegexValidator(r'^\d{9}$', 'O telefone deve ter 9 dígitos.')], null=True, blank=True)
-    email = models.EmailField(blank=True, default='')
-    # Entidade removed as it was duplicate of origem
-    origem = models.CharField('Origem', max_length=52, choices=ORIGEM_CHOICES, default='Pessoa Singular')
+    remetente = models.ForeignKey(
+        'ARQUIVOS.Utente',
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name='documentos'
+    )
 
     @property
     def dias_na_caixa(self):

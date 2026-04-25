@@ -46,12 +46,22 @@ class DocumentoForm(forms.ModelForm):
     Formulário para criação e edição de documentos
     """
 
+    input_nif = forms.CharField(max_length=14, required=False, widget=forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'Digite o NIF / BI'}))
+    input_nome = forms.CharField(max_length=200, required=False, widget=forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'Digite o Nome'}))
+    input_telefone = forms.CharField(max_length=50, required=False, widget=forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'Telefone'}))
+    input_email = forms.EmailField(max_length=200, required=False, widget=forms.EmailInput(attrs={'class': 'form-input', 'placeholder': 'Digite o Email'}))
+    input_origem = forms.ChoiceField(
+        choices=[('Pessoa Singular', 'Pessoa Singular'), ('Instituição do Estado', 'Instituição do Estado'), ('Instituição Pública', 'Instituição Pública'), ('Instituição Privada', 'Instituição Privada'), ('Organização cívil', 'Organização cívil')],
+        required=False,
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+
     class Meta:
         model = Documento
         fields = [
             'titulo', 'tipo_documento', 'prioridade',
-            'arquivo', 'arquivo_digitalizado', 'tags',
-            'utente', 'telefone', 'email', 'origem', 'niveis', 'referencia',
+            'arquivo', 'tags',
+            'remetente', 'niveis', 'referencia',
         ]
         widgets = {
             'titulo': forms.TextInput(attrs={
@@ -60,17 +70,8 @@ class DocumentoForm(forms.ModelForm):
                 'maxlength': '200',
                 'required': True,
             }),
-            'utente': forms.TextInput(attrs={
-                'class': 'form-input',
-                'placeholder': 'Digite o Nome',
-                'maxlength': '200',
-                'required': True,
-            }),
-            'email': forms.EmailInput(attrs={
-                'class': 'form-input',
-                'placeholder': 'Digite o Email',
-                'maxlength': '200',
-                'required': True,
+            'remetente': forms.HiddenInput(attrs={
+                'required': False,
             }),
             'tipo_documento': forms.Select(attrs={'class': 'form-select'}),
             'prioridade': forms.Select(attrs={
@@ -79,10 +80,6 @@ class DocumentoForm(forms.ModelForm):
             'arquivo': forms.FileInput(attrs={
                 'class': 'file-input',
                 'accept': '.pdf,.doc,.docx,.jpg,.jpeg,.png'
-            }),
-            'arquivo_digitalizado': forms.FileInput(attrs={
-                'class': 'file-input',
-                'accept': '.pdf,.jpg,.jpeg,.png'
             }),
             'tags': forms.TextInput(attrs={
                 'class': 'form-input',
@@ -191,8 +188,12 @@ class EncaminharDocumentoForm(forms.ModelForm):
                 self.show_external = False
             # Filtro de Técnicos de Secção (Nível 0)
             # Regra: Técnico não encaminha para fora. Só DEVOLVE à chefia da sua secção.
-            if getattr(self.user, 'eh_tecnico', False) and getattr(self.user, 'seccao', None):
-                # Técnico de Secção: vê APENAS a própria secção (para devolver à chefia).
+            # EXCEÇÃO: Técnico de EXPEDIENTE pode encaminhar para qualquer lado (HierarchyManager já trata se não bloquearmos aqui)
+            from .hierarchy_manager import _is_expediente
+            is_exp = _is_expediente(getattr(self.user, 'seccao', None))
+
+            if getattr(self.user, 'eh_tecnico', False) and getattr(self.user, 'seccao', None) and not is_exp:
+                # Técnico de Secção SOCIAL/OUTROS: vê APENAS a própria secção (para devolver à chefia).
                 # Não vê departamentos nem destinos externos.
                 qs_hierarquico = Administracao.objects.none()
                 qs_dept_permitidos = Departamento.objects.none()
@@ -681,6 +682,22 @@ class DespachoForm(forms.Form):
     )
 
     observacoes = forms.CharField(label='Observações', required=False)
+
+    def __init__(self, *args, **kwargs):
+        user = kwargs.pop('user', None)
+        super().__init__(*args, **kwargs)
+        
+        if user:
+            from .hierarchy_manager import _is_expediente
+            seccao_user = getattr(user, 'seccao', None)
+            
+            # REGRA: Só o Expediente arquiva.
+            if not _is_expediente(seccao_user):
+                # Remove 'arquivado' das opções se não for expediente
+                self.fields['novo_status'].choices = [
+                    c for c in self.STATUS_CHOICES 
+                    if c[0] != StatusDocumento.ARQUIVADO
+                ]
 
 
 class BuscaAvancadaForm(forms.Form):
