@@ -46,7 +46,12 @@ class DocumentoForm(forms.ModelForm):
     Formulário para criação e edição de documentos
     """
 
-    input_nif = forms.CharField(max_length=14, required=False, widget=forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'Digite o NIF / BI'}))
+    input_nif = forms.CharField(max_length=14, required=False, widget=forms.TextInput(attrs={
+        'class': 'form-input', 
+        'placeholder': 'Digite o NIF / BI',
+        'style': 'text-transform: uppercase;',
+        'oninput': 'this.value = this.value.toUpperCase()'
+    }))
     input_nome = forms.CharField(max_length=200, required=False, widget=forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'Digite o Nome'}))
     input_telefone = forms.CharField(max_length=50, required=False, widget=forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'Telefone'}))
     input_email = forms.EmailField(max_length=200, required=False, widget=forms.EmailInput(attrs={'class': 'form-input', 'placeholder': 'Digite o Email'}))
@@ -55,6 +60,12 @@ class DocumentoForm(forms.ModelForm):
         required=False,
         widget=forms.Select(attrs={'class': 'form-select'})
     )
+
+    def clean_input_nif(self):
+        nif = self.cleaned_data.get('input_nif')
+        if nif:
+            return nif.upper()
+        return nif
 
     class Meta:
         model = Documento

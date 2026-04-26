@@ -1,0 +1,98 @@
+services:
+  # =====================
+  # Aplicação Django (SIGAP)
+  # =====================
+  web:
+    build: .
+    container_name: sigap_admin_web
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env.offline
+    environment:
+      - EMAIL_HOST=mail.bryzzafood.com
+      - EMAIL_PORT=465
+      - EMAIL_USE_TLS=False
+      - EMAIL_USE_SSL=True
+      - EMAIL_HOST_USER=sigap@bryzzafood.com
+      - EMAIL_HOST_PASSWORD=@Sigap2026@
+      - DEFAULT_FROM_EMAIL=SIGAP <sigap@bryzzafood.com>
+    volumes:
+      - .:/app
+      - static_volume:/app/staticfiles
+      - media_volume:/app/media
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    # Comando de inicialização otimizado para a Administração offline
+    command: sh -c "python manage.py collectstatic --no-input && python manage.py migrate && gunicorn SGA.asgi:application --worker-class uvicorn.workers.UvicornWorker --workers 4 --bind 0.0.0.0:8000 --timeout 120 --log-level info"
+
+  # =====================
+  # Base de Dados (PostgreSQL)
+  # =====================
+  db:
+    image: postgres:16-alpine
+    container_name: sigap_admin_db
+    restart: unless-stopped
+    env_file:
+      - .env.offline
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres -d sigap_offline" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # =====================
+  # Redis (Para tarefas e sincronização)
+  # =====================
+  redis:
+    image: redis:7-alpine
+    container_name: sigap_admin_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # =====================
+  # Sync Daemon (Sincronização Automática)
+  # =====================
+  sync_daemon:
+    build: .
+    container_name: sigap_admin_sync
+    restart: unless-stopped
+    env_file:
+      - .env.offline
+    environment:
+      - DEBUG=False
+      - DATABASE_URL=postgres://postgres:senha_segura_do_banco@db:5432/sigap_offline
+      - REDIS_URL=redis://redis:6379/0
+      - DJANGO_SETTINGS_MODULE=SGA.settings
+      - SYNC_INSTANCE_ID=sigap_local_v1
+    volumes:
+      - .:/app
+      - media_volume:/app/media
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: python manage.py sync_data --daemon
+
+volumes:
+  postgres_data:
+  redis_data:
+  static_volume:
+  media_volume:

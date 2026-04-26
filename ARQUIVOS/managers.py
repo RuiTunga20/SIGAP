@@ -37,24 +37,27 @@ class DocumentoManager(SoftDeleteManager):
         # --- NOVA LÓGICA DE CONFIDENCIALIDADE E HIERARQUIA ---
         
         # Se for Técnico (Nível 0), aplica filtro restritivo "NEED-TO-KNOW"
-        if getattr(user, 'eh_tecnico', False):
+        # MAS: Permite ver todos os expedientes registados HOJE na sua administração
+        if getattr(user, 'eh_tecnico', lambda: False)():
+             from django.utils import timezone
+             hoje = timezone.now().date()
+             
              # 1. Meus documentos (criados ou atribuídos ou histórico)
-             # 2. PLUS: Qualquer documento finalizado (Arquivo Morto) do meu departamento/secção
+             q_meus = Q(criado_por=user) | Q(responsavel_atual=user) | Q(movimentacoes__usuario=user)
              
-             status_mortos = [
-                 'despacho', 'aprovado', 'reprovado', 'arquivado'
-             ]
+             # 2. Documentos da minha administração criados hoje (Acesso solicitado)
+             q_hoje = Q(administracao=user.administracao, data_criacao__date=hoje)
              
-             q_base = Q(criado_por=user) | Q(responsavel_atual=user) | Q(movimentacoes__usuario=user)
-             
+             # 3. PLUS: Qualquer documento finalizado (Arquivo Morto) do meu departamento/secção
+             status_mortos = ['despacho', 'aprovado', 'reprovado', 'arquivado']
              if user.seccao:
                  q_arquivo_morto = Q(seccao_atual=user.seccao, status__in=status_mortos)
              elif user.departamento:
                  q_arquivo_morto = Q(departamento_atual=user.departamento, seccao_atual__isnull=True, status__in=status_mortos)
              else:
                  q_arquivo_morto = Q(pk__in=[])
-                 
-             return qs.filter(q_base | q_arquivo_morto).distinct()
+                  
+             return qs.filter(q_meus | q_hoje | q_arquivo_morto).distinct()
 
         # Se for Chefia/Direção (Nivel >= 1), vê tudo do seu setor + Histórico
         # (Mantém lógica original de setor, mas agora restrita a chefes)

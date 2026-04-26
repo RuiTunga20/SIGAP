@@ -491,27 +491,17 @@ def detalhe_documento(request, documento_id):
     observacoes_qs = MovimentacaoDocumento.objects.filter(documento=documento)
     
     if is_tecnico:
-        # REGRA REFINADA: Técnico sempre vê seus pareceres e pareceres de chefia (instruções)
-        # Mas nunca vê pareceres técnicos de outros técnicos.
-        observacoes_qs = observacoes_qs.filter(
-            Q(usuario=request.user) | 
-            Q(usuario__nivel_sigilo__gte=1)
-        ).exclude(
-            Q(usuario__nivel_sigilo=0) & ~Q(usuario=request.user)
-        )
+        # REGRA RESTRITA: Técnico só vê seus próprios pareceres.
+        # Despachos e pareceres de chefias ou outros técnicos ficam ocultos.
+        observacoes_qs = observacoes_qs.filter(usuario=request.user)
     else:
-        # REGRA REFINADA: Diretores/Chefes veem pareceres de outros chefes E de seus técnicos diretos.
-        # "ambos vejam o parecer um do outro" (Chefe <-> Técnico do mesmo setor)
+        # REGRA CHEFIA: Diretores/Chefes veem tudo do seu setor
         if user_seccao:
-            # Chefe de Secção vê: Chefia + Técnicos da sua própria Secção
             observacoes_qs = observacoes_qs.filter(
                 Q(usuario__nivel_sigilo__gte=1) |
                 Q(usuario__seccao=user_seccao)
             )
         else:
-            # Diretor vê: Chefia + Técnicos diretos do Departamento (sem secção)
-            # Nota: Técnicos de secções específicas ficam "ocultos" para o Diretor (isolamento de secção)
-            # a menos que o parecer tenha sido encaminhado especificamente para o departamento.
             observacoes_qs = observacoes_qs.filter(
                 Q(usuario__nivel_sigilo__gte=1) |
                 Q(usuario__departamento=user_departamento, usuario__seccao__isnull=True)
@@ -721,6 +711,24 @@ def detalhe_documento(request, documento_id):
                             movimentacao.departamento_origem = user_departamento
 
                         movimentacao.save()
+
+                        # GERAÇÃO AUTOMÁTICA DE DESPACHO PARA CHEFIA
+                        if request.user.nivel_sigilo >= 1 and movimentacao.observacoes:
+                            try:
+                                from .utils import gerar_pdf_despacho
+                                pdf_content = gerar_pdf_despacho(
+                                    documento, 
+                                    movimentacao.observacoes, 
+                                    request.user, 
+                                    None, 
+                                    request=request
+                                )
+                                # Salva no documento principal para ficar disponível para download/impressão
+                                if pdf_content:
+                                    documento.arquivo_digitalizado.save(pdf_content.name, pdf_content, save=False)
+                                    documento.save()
+                            except Exception as e:
+                                print(f"Erro ao gerar despacho automático: {e}")
 
                         # ===== ATUALIZAR LOCALIZAÇÃO ATUAL DO DOCUMENTO =====
                         documento.status = StatusDocumento.ENCAMINHAMENTO
@@ -1773,7 +1781,7 @@ def arquivo_morto(request):
 
     context = {
         'documentos': documentos,
-        'titulo_pagina': 'Arquivo Morto',
+        'titulo_pagina': 'Despachados',
     }
 
     return render(request, 'Paginasarquivo_morto.html', context)

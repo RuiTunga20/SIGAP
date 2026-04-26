@@ -115,7 +115,7 @@
                             {% endif %}
                         </div>
                         <div>
-                            <p class="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">Localização Atual</p>
+                            <p class="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">Área Actual</p>
                             <p class="text-sm font-bold text-slate-800 flex items-center gap-1.5">
                                 <i data-lucide="map-pin" class="w-3.5 h-3.5 text-sga-red"></i>
                                 {{ documento.departamento_atual.nome }}
@@ -132,7 +132,13 @@
                 <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
                     <div class="px-6 py-4 border-b border-slate-50 bg-slate-50/50 flex items-center gap-2">
                         <i data-lucide="message-square" class="w-4 h-4 text-sga-red"></i>
-                        <h3 class="text-xs font-black uppercase tracking-widest text-slate-500">Pareceres e Observações Técnicas</h3>
+                        <h3 class="text-xs font-black uppercase tracking-widest text-slate-500">
+                            {% if user.nivel_acesso == 'tecnico' %}
+                                Pareceres e Observações Técnicas
+                            {% else %}
+                                Despachos e Observações Internas
+                            {% endif %}
+                        </h3>
                     </div>
                     <div class="divide-y divide-slate-50" id="pareceres-container">
                         {% if documento.observacoes %}
@@ -142,14 +148,18 @@
                                 </div>
                                 <div class="flex-1">
                                     <div class="flex items-center justify-between mb-2">
-                                        <span class="text-sm font-bold text-slate-800">Parecer Inicial de Cadastro</span>
+                                        <span class="text-sm font-bold text-slate-800">Despacho Final</span>
                                         <span class="text-[10px] font-bold text-slate-400 uppercase tracking-tight">
                                             {{ documento.criado_por.get_full_name|default:documento.criado_por.username }}
                                         </span>
                                     </div>
                                     <div class="text-sm text-slate-600 leading-relaxed italic relative">
                                         <p class="parecer-text line-clamp-2 transition-all duration-300">
-                                            "{{ documento.observacoes|safe }}"
+                                            {% if user.nivel_acesso != 'tecnico' or documento.criado_por == user %}
+                                                "{{ documento.observacoes|safe }}"
+                                            {% else %}
+                                                <span class="text-slate-400"><i data-lucide="lock" class="w-3 h-3 inline"></i> Conteúdo reservado à chefia</span>
+                                            {% endif %}
                                         </p>
                                         <button type="button" class="btn-ler-mais hidden text-[10px] font-bold text-sga-red hover:text-red-700 uppercase tracking-wider mt-1">Ler mais</button>
                                     </div>
@@ -191,7 +201,11 @@
                                         {% if obs.observacoes %}
                                             <div class="text-sm text-slate-600 leading-relaxed italic mb-2 relative">
                                                 <div class="parecer-text line-clamp-2 transition-all duration-300">
-                                                    "{{ obs.observacoes|safe }}"
+                                                    {% if user.nivel_sigilo >= 1 or obs.usuario == user %}
+                                                        "{{ obs.observacoes|safe }}"
+                                                    {% else %}
+                                                        <span class="text-slate-400 italic font-medium"><i data-lucide="lock" class="w-3 h-3 inline"></i> Conteúdo reservado à chefia</span>
+                                                    {% endif %}
                                                 </div>
                                                 <button type="button" class="btn-ler-mais hidden text-[10px] font-bold text-sga-blue hover:text-blue-700 uppercase tracking-wider mt-1">Ler mais</button>
                                             </div>
@@ -385,7 +399,13 @@
                             {% endif %}
 
                             <div class="space-y-1.5">
-                                <label class="text-xs font-bold text-slate-600 uppercase tracking-wider block mb-1">Despacho Interno</label>
+                                <label class="text-xs font-bold text-slate-600 uppercase tracking-wider block mb-1">
+                                    {% if user.nivel_acesso == 'tecnico' %}
+                                        Seu Parecer Técnico / Orientação
+                                    {% else %}
+                                        Despacho Interno
+                                    {% endif %}
+                                </label>
                                 {{ encaminhar_form.observacoes }}
                                 <div class="form-errors text-xs text-red-500 mt-1 font-bold">{{ encaminhar_form.observacoes.errors }}</div>
                             </div>
@@ -555,10 +575,16 @@
                                 </div>
 
                                 {% if mov.despacho %}
-                                <div class="mt-4 p-3 bg-amber-50/50 border-l-2 border-amber-300 rounded-r-lg text-[11px] text-amber-900 font-medium italic leading-relaxed">
-                                    <i data-lucide="pen-tool" class="w-3 h-3 inline-block mr-1 opacity-50"></i>
-                                        {{ mov.despacho|truncatechars_html:50|safe }}
-                                </div>
+                                    {% if user.nivel_acesso != 'tecnico' or mov.usuario == user %}
+                                    <div class="mt-4 p-3 bg-amber-50/50 border-l-2 border-amber-300 rounded-r-lg text-[11px] text-amber-900 font-medium italic leading-relaxed">
+                                        <i data-lucide="pen-tool" class="w-3 h-3 inline-block mr-1 opacity-50"></i>
+                                            {{ mov.despacho|truncatechars_html:50|safe }}
+                                    </div>
+                                    {% else %}
+                                    <div class="mt-4 p-2 bg-slate-50 border border-slate-100 rounded-lg text-[10px] text-slate-400 font-medium flex items-center gap-2">
+                                        <i data-lucide="lock" class="w-3 h-3"></i> Despacho reservado
+                                    </div>
+                                    {% endif %}
                                 {% endif %}
                             </div>
                         </div>

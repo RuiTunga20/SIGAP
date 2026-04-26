@@ -132,29 +132,36 @@
 
                             <!-- Ações -->
                             <td class="px-6 py-4">
-                                <div class="flex items-center justify-end gap-2">
-                                    <a href="{% url 'detalhe_documento' documento.id %}" 
-                                       title="Ver Detalhes"
-                                       class="p-2 text-slate-400 hover:text-sga-blue hover:bg-blue-50 rounded-lg transition-all"
-                                    >
-                                        <i data-lucide="eye" class="w-4 h-4"></i>
-                                    </a>
+                                <div class="flex flex-col items-end gap-1.5">
+                                    <div class="flex items-center justify-end gap-2">
+                                        <a href="{% url 'detalhe_documento' documento.id %}" 
+                                           title="Ver Detalhes"
+                                           class="p-2 text-slate-400 hover:text-sga-blue hover:bg-blue-50 rounded-lg transition-all"
+                                        >
+                                            <i data-lucide="eye" class="w-4 h-4"></i>
+                                        </a>
 
-                                    {% if not documento.movimentacoes.exists %}
-                                    <a href="{% url 'editar_documento' documento.id %}" 
-                                       title="Editar"
-                                       class="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-all"
-                                    >
-                                        <i data-lucide="edit-3" class="w-4 h-4"></i>
-                                    </a>
-                                    {% endif %}
+                                        {% if not documento.movimentacoes.exists %}
+                                        <a href="{% url 'editar_documento' documento.id %}" 
+                                           title="Editar"
+                                           class="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-all"
+                                        >
+                                            <i data-lucide="edit-3" class="w-4 h-4"></i>
+                                        </a>
+                                        {% endif %}
 
-                                    {% if user.nivel_acesso == 'admin' or user.nivel_acesso == 'diretor' or user.nivel_acesso == 'gerente' or user.nivel_acesso == 'admin_sistema' %}
-                                    <a href="{% url 'detalhe_documento' documento.id %}" 
-                                       title="Encaminhar"
-                                       class="inline-flex items-center justify-center w-10 h-10 bg-slate-100 hover:bg-slate-900 hover:text-white text-slate-400 rounded-xl transition-all shadow-sm group/btn"
-                                    >
-                                        <i data-lucide="send" class="w-4 h-4"></i>
+                                        {% if user.nivel_acesso != 'tecnico' %}
+                                        <a href="{% url 'detalhe_documento' documento.id %}" 
+                                           title="Encaminhar"
+                                           class="inline-flex items-center justify-center w-8 h-8 bg-slate-50 hover:bg-slate-900 hover:text-white text-slate-400 rounded-lg transition-all group/btn"
+                                        >
+                                            <i data-lucide="send" class="w-3.5 h-3.5"></i>
+                                        </a>
+                                        {% endif %}
+                                    </div>
+                                    {% if documento.remetente %}
+                                    <a href="{% url 'utente_ficha' documento.remetente.id %}" class="inline-flex items-center gap-1 text-[9px] font-black text-blue-500 hover:text-blue-700 uppercase tracking-tighter transition-colors">
+                                        <i data-lucide="history" class="w-2.5 h-2.5"></i> Ver Antecedentes
                                     </a>
                                     {% endif %}
                                 </div>
