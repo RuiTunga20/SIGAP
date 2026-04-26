@@ -25,39 +25,45 @@ class DocumentoManager(SoftDeleteManager):
         if not user.is_superuser and user.administracao:
             if not user.administracao:
                 return qs.none()
-            
+
             # Filtro Multi-Tenant: Apenas documentos da administração
             qs = qs.filter(
-                Q(administracao=user.administracao) | 
+                Q(administracao=user.administracao) |
                 Q(departamento_atual__administracao=user.administracao) |
                 Q(movimentacoes__departamento_destino__administracao=user.administracao) |
                 Q(movimentacoes__seccao_destino__departamento__administracao=user.administracao)
             ).distinct()
 
         # --- NOVA LÓGICA DE CONFIDENCIALIDADE E HIERARQUIA ---
-        
+
         # Se for Técnico (Nível 0), aplica filtro restritivo "NEED-TO-KNOW"
         # MAS: Permite ver todos os expedientes registados HOJE na sua administração
-        if getattr(user, 'eh_tecnico', lambda: False)():
-             from django.utils import timezone
-             hoje = timezone.now().date()
-             
-             # 1. Meus documentos (criados ou atribuídos ou histórico)
-             q_meus = Q(criado_por=user) | Q(responsavel_atual=user) | Q(movimentacoes__usuario=user)
-             
-             # 2. Documentos da minha administração criados hoje (Acesso solicitado)
-             q_hoje = Q(administracao=user.administracao, data_criacao__date=hoje)
-             
-             # 3. PLUS: Qualquer documento finalizado (Arquivo Morto) do meu departamento/secção
-             status_mortos = ['despacho', 'aprovado', 'reprovado', 'arquivado']
-             if user.seccao:
-                 q_arquivo_morto = Q(seccao_atual=user.seccao, status__in=status_mortos)
-             elif user.departamento:
-                 q_arquivo_morto = Q(departamento_atual=user.departamento, seccao_atual__isnull=True, status__in=status_mortos)
-             else:
-                 q_arquivo_morto = Q(pk__in=[])
-                  
-             return qs.filter(q_meus | q_hoje | q_arquivo_morto).distinct()
+        # Verificação robusta de eh_tecnico (suporta booleano ou método)
+        eh_tecnico_val = getattr(user, 'eh_tecnico', False)
+        if callable(eh_tecnico_val):
+            eh_tecnico_val = eh_tecnico_val()
+            
+        if eh_tecnico_val:
+            from django.utils import timezone
+            hoje = timezone.now().date()
+
+            # 1. Meus documentos (criados ou atribuídos ou histórico)
+            q_meus = Q(criado_por=user) | Q(responsavel_atual=user) | Q(movimentacoes__usuario=user)
+
+            # 2. Documentos da minha administração criados hoje (Acesso solicitado)
+            q_hoje = Q(administracao=user.administracao, data_criacao__date=hoje)
+
+            # 3. PLUS: Qualquer documento finalizado (Arquivo Morto) do meu departamento/secção
+            status_mortos = ['despacho', 'aprovado', 'reprovado', 'arquivado']
+            if user.seccao:
+                q_arquivo_morto = Q(seccao_atual=user.seccao, status__in=status_mortos)
+            elif user.departamento:
+                q_arquivo_morto = Q(departamento_atual=user.departamento, seccao_atual__isnull=True,
+                                    status__in=status_mortos)
+            else:
+                q_arquivo_morto = Q(pk__in=[])
+
+            return qs.filter(q_meus | q_hoje | q_arquivo_morto).distinct()
 
         # Se for Chefia/Direção (Nivel >= 1), vê tudo do seu setor + Histórico
         # (Mantém lógica original de setor, mas agora restrita a chefes)
@@ -97,12 +103,14 @@ class DocumentoManager(SoftDeleteManager):
 
 class AdministracaoManager(models.Manager):
     """Manager para Administracao com suporte a Natural Keys"""
+
     def get_by_natural_key(self, uuid_sinc):
         return self.get(uuid_sinc=uuid_sinc)
 
 
 class DepartamentoManager(models.Manager):
     """Manager para Departamento com lógica de isolamento e Natural Keys"""
+
     def get_by_natural_key(self, uuid_sinc):
         return self.get(uuid_sinc=uuid_sinc)
 
@@ -123,14 +131,17 @@ class DepartamentoManager(models.Manager):
 
 class SeccaoManager(models.Manager):
     """Manager para Secção com suporte a Natural Keys"""
+
     def get_by_natural_key(self, uuid_sinc):
         return self.get(uuid_sinc=uuid_sinc)
 
 
 from django.contrib.auth.models import UserManager as BaseUserManager
 
+
 class UsuarioManager(BaseUserManager):
     """Manager para CustomUser com lógica de isolamento e Natural Keys"""
+
     def get_by_natural_key(self, identifier):
         try:
             # Tenta tratar o identificador como UUID (para sincronização entre instâncias)
