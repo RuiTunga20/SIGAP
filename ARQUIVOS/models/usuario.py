@@ -137,12 +137,12 @@ class CustomUser(AbstractUser, SyncMixin):
             'diretor_gabinete', 'chefe_departamento', 'tecnico',
         ],
         'E': [  # Administrações Municipais Tipo E (Simplificada)
-            'admin_sistema', 'admin_municipal', 
-            'chefe_seccao', 'secretario_admin', 'tecnico',
+            'admin_sistema', 'admin_municipal', 'admin_adjunto',
+            'diretor_municipal', 'chefe_seccao', 'tecnico',
         ],
         '_default': [  # Administrações Municipais (A-D)
             'admin_sistema', 'admin_municipal', 'admin_adjunto',
-            'diretor_municipal', 'chefe_seccao', 'tecnico',
+            'diretor_municipal', 'chefe_seccao', 'secretario_admin', 'tecnico',
         ],
     }
 
