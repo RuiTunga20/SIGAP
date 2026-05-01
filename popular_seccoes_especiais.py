@@ -76,8 +76,6 @@ def popular_seccoes_especiais():
     ESTRUTURA_TIPO_E = {
         'Gabinete do Administrador Municipal': [
             'Administrador Municipal',
-            'Assessor do Administrador Municipal',
-            'Director de Gabinete do Administrador Municipal',
             'Secretário do Administrador Municipal',
         ],
         'Gabinete do Administrador Municipal Adjunto': [

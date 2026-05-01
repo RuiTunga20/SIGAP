@@ -63,10 +63,12 @@ class NotificacaoConsumer(AsyncWebsocketConsumer):
             action = data.get('action')
             
             if action == 'mark_read':
-                await self.mark_notifications_read()
+                notification_id = data.get('notification_id')
+                await self.mark_notification_read(notification_id)
+                count = await self.get_unread_count()
                 await self.send(text_data=json.dumps({
-                    'type': 'notifications_marked_read',
-                    'success': True
+                    'type': 'notification_count',
+                    'count': count
                 }))
             
             elif action == 'get_count':
@@ -131,13 +133,13 @@ class NotificacaoConsumer(AsyncWebsocketConsumer):
         ).count()
     
     @database_sync_to_async
-    def mark_notifications_read(self):
-        """Marcar todas notificações como lidas."""
+    def mark_notification_read(self, notification_id=None):
+        """Marcar notificação(ões) como lida(s). Se notification_id for fornecido, marca apenas essa."""
         from .models import Notificacao
-        Notificacao.objects.filter(
-            usuario=self.user,
-            lida=False
-        ).update(lida=True)
+        qs = Notificacao.objects.filter(usuario=self.user, lida=False)
+        if notification_id:
+            qs = qs.filter(id=notification_id)
+        qs.update(lida=True)
     
     @database_sync_to_async
     def get_pendencias_count(self):

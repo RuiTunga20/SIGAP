@@ -6,6 +6,7 @@
  * - Badge count updates
  * - Dropdown content updates (delegated to Alpine.js for visibility)
  * - Individual notification mark-as-read via API
+ * - Dynamic "X Novas" label updates
  */
 document.addEventListener('DOMContentLoaded', function () {
     if (!window.SGA_CONFIG) {
@@ -64,10 +65,11 @@ document.addEventListener('DOMContentLoaded', function () {
                         const dot = element.querySelector('.unread-indicator');
                         if (dot) dot.remove();
                     }
-                    // Decrement badge
-                    atualizarBadgeNotificacoes(Math.max(0, getBadgeCount() - 1));
+                    // Decrement badge and label
+                    const novoCount = Math.max(0, getBadgeCount() - 1);
+                    atualizarBadgeNotificacoes(novoCount);
 
-                    // Inform WebSocket 
+                    // Inform WebSocket with notification_id
                     if (window.notificationSocket && window.notificationSocket.readyState === WebSocket.OPEN) {
                         window.notificationSocket.send(JSON.stringify({ action: 'mark_read', notification_id: id }));
                     }
@@ -96,10 +98,10 @@ document.addEventListener('DOMContentLoaded', function () {
             } else if (bellBtn) {
                 // Create badge dynamically if it doesn't exist
                 const wrap = document.createElement('span');
-                wrap.className = 'notification-badge-wrap absolute top-1.5 right-1.5 flex h-4 w-4';
+                wrap.className = 'notification-badge-wrap absolute -top-0.5 -right-0.5 flex h-5 w-5';
                 wrap.innerHTML = `
-                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-sga-red opacity-75"></span>
-                    <span id="notificationCount" class="relative inline-flex rounded-full h-4 w-4 bg-sga-red items-center justify-center text-[10px] text-white font-bold">${count}</span>
+                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-sga-red opacity-60"></span>
+                    <span id="notificationCount" class="relative inline-flex rounded-full h-5 w-5 bg-sga-red items-center justify-center text-[10px] text-white font-black">${count}</span>
                 `;
                 bellBtn.style.position = 'relative';
                 bellBtn.appendChild(wrap);
@@ -108,6 +110,22 @@ document.addEventListener('DOMContentLoaded', function () {
             if (badge) {
                 const wrap = badge.closest('.notification-badge-wrap');
                 if (wrap) wrap.style.display = 'none';
+            }
+        }
+
+        // Always update the "X Novas" label
+        atualizarLabelNovas(count);
+    }
+
+    function atualizarLabelNovas(count) {
+        const labelEl = document.getElementById('notificationLabel');
+        if (labelEl) {
+            if (count > 0) {
+                labelEl.textContent = count + (count !== 1 ? ' Novas' : ' Nova');
+                labelEl.style.display = '';
+            } else {
+                labelEl.textContent = '0 Novas';
+                labelEl.style.display = 'none';
             }
         }
     }
@@ -209,6 +227,7 @@ document.addEventListener('DOMContentLoaded', function () {
             fetch(config.checkNotificationsUrl)
                 .then(r => r.json())
                 .then(data => {
+                    atualizarBadgeNotificacoes(data.unread_notifications_count || data.count || 0);
                     atualizarDropdownCompleto(data.notificacoes || []);
                 })
                 .catch(err => console.error('[WS] Erro ao buscar notificações:', err));
@@ -248,7 +267,7 @@ document.addEventListener('DOMContentLoaded', function () {
                             </a>
                         </div>
                     </div>
-                    ${!n.lida ? '<span class="unread-indicator w-2 h-2 bg-blue-500 rounded-full mt-1.5 flex-shrink-0 shadow-sm shadow-blue-200"></span>' : ''}
+                    ${!n.lida ? '<span class="unread-indicator w-2 h-2 bg-blue-500 rounded-full mt-1.5 flex-shrink-0 shadow-sm shadow-blue-200 animate-pulse"></span>' : ''}
                 `;
                 listContainer.appendChild(item);
             });

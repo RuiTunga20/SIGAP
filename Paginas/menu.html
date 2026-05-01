@@ -112,7 +112,7 @@
                                     <i data-lucide="bell" class="w-4 h-4 text-sga-red"></i>
                                     <h3 class="text-[11px] font-black uppercase tracking-widest text-slate-500">Notificações</h3>
                                 </div>
-                                <span class="text-[10px] px-2.5 py-1 bg-sga-red/10 text-sga-red rounded-lg font-black">{{ unread_notifications_count }} Nova{% if unread_notifications_count != 1 %}s{% endif %}</span>
+                                <span id="notificationLabel" class="text-[10px] px-2.5 py-1 bg-sga-red/10 text-sga-red rounded-lg font-black">{{ unread_notifications_count }} Nova{% if unread_notifications_count != 1 %}s{% endif %}</span>
                             </div>
                             <div class="max-h-[400px] overflow-y-auto notification-list">
                                 {% for notification in recent_notifications %}

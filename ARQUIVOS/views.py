@@ -1829,7 +1829,8 @@ def verificar_notificacoes(request):
             'id': n.id,
             'mensagem': n.mensagem,
             'link': n.link or '#',
-            'data': n.data_criacao.strftime('%d/%m/%Y %H:%M') if n.data_criacao else ''
+            'data': n.data_criacao.strftime('%d/%m/%Y %H:%M') if n.data_criacao else '',
+            'lida': n.lida
         }
         for n in notificacoes
     ]

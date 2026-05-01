@@ -53,6 +53,26 @@ def limpar_estrutura():
 
     # --- TIPO E ---
     print("\n--- 2a. Remoções Tipo E ---")
+    admins_e = Administracao.objects.filter(tipo_municipio='E')
+
+    # Remover Assessor e Director de Gabinete dos Gabinetes do Tipo E
+    SECCOES_GABINETE_TIPO_E_A_REMOVER = [
+        'Assessor do Administrador Municipal',
+        'Director de Gabinete do Administrador Municipal',
+    ]
+    for nome in SECCOES_GABINETE_TIPO_E_A_REMOVER:
+        qs = Seccoes.objects.filter(
+            nome__iexact=nome,
+            departamento__administracao__in=admins_e
+        )
+        count = qs.count()
+        if count > 0:
+            qs.delete()
+            total_sec_removidas += count
+            print(f"  [x] Removidas {count} secções: {nome}")
+        else:
+            print(f"  [=] Nenhuma encontrada: {nome}")
+
     DEPT_TIPO_E = [
         'Repartição de Administração e Serviços Gerais',
         'Repartição de Serviços Sociais e Económicos',
